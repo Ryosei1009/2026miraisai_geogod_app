@@ -1,18 +1,26 @@
 import cors from "cors";
 import express from "express";
+import dotenv from "dotenv";
 import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
 import { WebSocketServer } from "ws";
 
+dotenv.config();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-app.use(cors());
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "";
+const corsOptions = CLIENT_ORIGIN
+  ? { origin: CLIENT_ORIGIN, credentials: true }
+  : { origin: true };
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
-const SCORE_MODE = "separate";
+const SCORE_MODE = process.env.SCORE_MODE || "separate";
 
 function createGameId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;

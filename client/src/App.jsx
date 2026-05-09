@@ -10,6 +10,18 @@ function formatDistance(v) {
 }
 
 function wsUrlFromWindow() {
+    const envUrl = import.meta.env.VITE_WS_URL;
+    if (envUrl) return envUrl;
+    const apiBase = import.meta.env.VITE_API_BASE;
+    if (apiBase) {
+        try {
+            const apiUrl = new URL(apiBase);
+            apiUrl.protocol = apiUrl.protocol === "https:" ? "wss:" : "ws:";
+            return apiUrl.toString().replace(/\/$/, "");
+        } catch {
+            return apiBase;
+        }
+    }
     const isHttps = window.location.protocol === "https:";
     const protocol = isHttps ? "wss" : "ws";
 
