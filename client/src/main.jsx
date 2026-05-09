@@ -3,11 +3,13 @@ import ReactDOM from "react-dom/client";
 import "leaflet/dist/leaflet.css";
 import "./styles.css";
 import App from "./App";
+import { Analytics } from "@vercel/analytics/next"
 
 document.body.classList.add("theme-lava");
 
 ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
+  <>
+    <Analytics />
     <App />
-  </React.StrictMode>
+  </>
 );
