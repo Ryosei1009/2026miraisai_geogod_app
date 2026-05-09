@@ -33,7 +33,7 @@ function wsUrlFromWindow() {
 }
 
 export default function App() {
-    const isAdmin = useMemo(() => new URLSearchParams(window.location.search).get("admin") === "1", []);
+    const isAdmin = useMemo(() => new URLSearchParams(window.location.search).get("admin0173") === "1", []);
     const isRankView = useMemo(() => new URLSearchParams(window.location.search).get("rank") === "1", []);
 
     const storageKeys = {
@@ -227,6 +227,7 @@ export default function App() {
             <RankingView
                 ranking={gameState.ranking || []}
                 scoreMode={gameState.scoreMode || "separate"}
+                currentCategory={gameState.currentCategory || gameState.currentQuestion?.category || "trial"}
                 socketReady={socketReady}
             />
         );
