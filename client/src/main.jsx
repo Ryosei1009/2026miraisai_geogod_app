@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import "leaflet/dist/leaflet.css";
 import "./styles.css";
 import App from "./App";
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from "@vercel/analytics/react"
 
 document.body.classList.add("theme-lava");
 
