@@ -1,7 +1,9 @@
 import cors from "cors";
 import express from "express";
 import dotenv from "dotenv";
+import fs from "fs";
 import { createServer } from "http";
+import { createServer as createHttpsServer } from "https";
 import path from "path";
 import { fileURLToPath } from "url";
 import { WebSocketServer } from "ws";
@@ -243,7 +245,21 @@ function resetGame({ forceRejoin = false } = {}) {
   }
 }
 
-const httpServer = createServer(app);
+const useHttps = String(process.env.USE_HTTPS || "").toLowerCase() === "true";
+let httpServer;
+
+if (useHttps) {
+  const keyPath = process.env.HTTPS_KEY_PATH || "";
+  const certPath = process.env.HTTPS_CERT_PATH || "";
+  if (!keyPath || !certPath) {
+    throw new Error("USE_HTTPS is true, but HTTPS_KEY_PATH or HTTPS_CERT_PATH is missing.");
+  }
+  const key = fs.readFileSync(keyPath);
+  const cert = fs.readFileSync(certPath);
+  httpServer = createHttpsServer({ key, cert }, app);
+} else {
+  httpServer = createServer(app);
+}
 const wss = new WebSocketServer({ server: httpServer });
 
 wss.on("connection", (ws) => {
@@ -372,13 +388,13 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-const clientDistPath = path.join(__dirname, "../client/dist");
-app.use(express.static(clientDistPath));
-app.get("*", (_req, res) => {
-  res.sendFile(path.join(clientDistPath, "index.html"));
-});
+// const clientDistPath = path.join(__dirname, "../client/dist");
+// app.use(express.static(clientDistPath));
+// app.get("*", (_req, res) => {
+//   res.sendFile(path.join(clientDistPath, "index.html"));
+// });
 
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Server running on https://${process.env.SERVER_DOMAIN}`);
 });
