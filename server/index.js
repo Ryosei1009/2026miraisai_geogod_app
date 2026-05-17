@@ -44,13 +44,36 @@ const questions = [
   { id: 11, title: "世界5: シドニー・オペラハウス", answer: { lat: -33.85678, lng: 151.2153 }, category: "world" }
 ];
 
-const gameState = {
+const performers = [
+  { id: 1, no: "No.1", name: "グループA" },
+  { id: 2, no: "No.2", name: "グループB" },
+  { id: 3, no: "No.3", name: "グループC" },
+  { id: 4, no: "No.4", name: "グループD" },
+  { id: 5, no: "No.5", name: "グループE" },
+  { id: 6, no: "No.6", name: "グループF" }
+];
+
+let currentMode = "geo";
+
+const geoState = {
   phase: "waiting",
   currentQuestionIndex: 0
 };
 
+const goodState = {
+  phase: "waiting",
+  currentIndex: -1
+};
+
 const clients = new Map();
 const participantsById = new Map();
+const performerStats = performers.map((performer) => ({
+  id: performer.id,
+  goodCount: 0,
+  participantCount: 0,
+  locked: false,
+  voters: new Set()
+}));
 
 function blankScores() {
   return { trial: 0, japan: 0, world: 0 };
@@ -116,16 +139,21 @@ function buildRanking() {
     .sort((a, b) => b.totalScore - a.totalScore);
 }
 
-function buildStateFor(meta) {
-  const currentQuestion = questions[gameState.currentQuestionIndex];
+function buildGeoStateFor(meta) {
+  const currentQuestion = questions[geoState.currentQuestionIndex];
   const base = {
-    phase: gameState.phase,
-    currentQuestionIndex: gameState.currentQuestionIndex,
+    mode: "geo",
+    phase: geoState.phase,
+    currentQuestionIndex: geoState.currentQuestionIndex,
     totalQuestions: questions.length,
+    questionList: questions.map((q, index) => ({
+      index,
+      label: `第${index + 1}問 ${q.title}`
+    })),
     currentQuestion: currentQuestion
       ? {
           id: currentQuestion.id,
-          title: `第${gameState.currentQuestionIndex + 1}問`,
+          title: `第${geoState.currentQuestionIndex + 1}問`,
           category: currentQuestion.category || null
         }
       : null,
@@ -134,7 +162,7 @@ function buildStateFor(meta) {
     ranking: buildRanking(),
     scoreMode: SCORE_MODE,
     gameId,
-    revealedAnswer: gameState.phase === "closed" && currentQuestion
+    revealedAnswer: geoState.phase === "closed" && currentQuestion
       ? currentQuestion.answer
       : null
   };
@@ -153,11 +181,80 @@ function buildStateFor(meta) {
       scores: meta.scores,
       currentCategory,
       currentCategoryScore: meta.scores[currentCategory] ?? 0,
-      currentAnswer: meta.answers[gameState.currentQuestionIndex] || null,
+      currentAnswer: meta.answers[geoState.currentQuestionIndex] || null,
       hasSubmittedCurrent: Boolean(meta.currentPin),
       lastRound: meta.lastRound
     }
   };
+}
+
+function resetStats() {
+  for (const stat of performerStats) {
+    stat.goodCount = 0;
+    stat.participantCount = 0;
+    stat.locked = false;
+    stat.voters.clear();
+  }
+}
+
+function resetGoodGame() {
+  resetStats();
+  goodState.phase = "waiting";
+  goodState.currentIndex = -1;
+}
+
+function goodAudienceCount() {
+  let count = 0;
+  for (const meta of clients.values()) {
+    if (meta.role !== "admin" && meta.role !== "guest") count += 1;
+  }
+  return count;
+}
+
+function buildStatsSummary() {
+  const liveAudience = goodAudienceCount();
+  return performerStats.map((stat, index) => {
+    const isCurrent = goodState.phase === "live" && index === goodState.currentIndex;
+    const goodCount = isCurrent && !stat.locked ? stat.voters.size : stat.goodCount;
+    const participantCount = isCurrent && !stat.locked ? liveAudience : stat.participantCount;
+    return {
+      id: stat.id,
+      no: performers[index]?.no || "",
+      name: performers[index]?.name || "",
+      goodCount,
+      participantCount,
+      locked: stat.locked
+    };
+  });
+}
+
+function hasVotedCurrent(meta) {
+  if (!meta || meta.role === "admin" || meta.role === "guest") return false;
+  if (goodState.phase !== "live") return false;
+  if (!Number.isFinite(goodState.currentIndex) || goodState.currentIndex < 0) return false;
+  const stat = performerStats[goodState.currentIndex];
+  if (!stat) return false;
+  return Boolean(meta.clientId && stat.voters.has(meta.clientId));
+}
+
+function buildGoodStateFor(meta) {
+  return {
+    mode: "good",
+    phase: goodState.phase,
+    currentIndex: goodState.currentIndex,
+    totalPerformers: performers.length,
+    performers,
+    stats: buildStatsSummary(),
+    audienceCount: goodAudienceCount(),
+    hasVotedCurrent: hasVotedCurrent(meta)
+  };
+}
+
+function buildStateFor(meta) {
+  if (currentMode === "good") {
+    return buildGoodStateFor(meta);
+  }
+  return buildGeoStateFor(meta);
 }
 
 function send(ws, message) {
@@ -173,12 +270,12 @@ function broadcastState() {
 }
 
 function closeCurrentQuestionAndScore() {
-  const q = questions[gameState.currentQuestionIndex];
+  const q = questions[geoState.currentQuestionIndex];
   const resultRows = [];
 
   for (const { ws, name, currentPin, answers, scores } of getParticipants()) {
     const qCategory = q.category || "japan";
-    const ans = answers[gameState.currentQuestionIndex] || currentPin;
+    const ans = answers[geoState.currentQuestionIndex] || currentPin;
     let gained = 0;
     let distanceKm = null;
 
@@ -224,9 +321,9 @@ function broadcastForceRejoin() {
   }
 }
 
-function resetGame({ forceRejoin = false } = {}) {
-  gameState.phase = "waiting";
-  gameState.currentQuestionIndex = 0;
+function resetGeoGame({ forceRejoin = false } = {}) {
+  geoState.phase = "waiting";
+  geoState.currentQuestionIndex = 0;
   if (forceRejoin) {
     gameId = createGameId();
     participantsById.clear();
@@ -243,6 +340,15 @@ function resetGame({ forceRejoin = false } = {}) {
       }
     }
   }
+}
+
+function lockCurrentStats() {
+  if (!Number.isFinite(goodState.currentIndex) || goodState.currentIndex < 0) return;
+  const stat = performerStats[goodState.currentIndex];
+  if (!stat) return;
+  stat.goodCount = stat.voters.size;
+  stat.participantCount = goodAudienceCount();
+  stat.locked = true;
 }
 
 const useHttps = String(process.env.USE_HTTPS || "").toLowerCase() === "true";
@@ -281,11 +387,17 @@ wss.on("connection", (ws) => {
       const meta = clients.get(ws);
       if (!meta) return;
 
+      if (msg.type === "state:request") {
+        send(ws, { type: "state", payload: buildStateFor(meta) });
+        return;
+      }
+
       if (msg.type === "join") {
         if (msg.role === "admin") {
           meta.role = "admin";
           meta.name = "運営";
-        } else {
+          meta.clientId = null;
+        } else if (msg.role === "participant") {
           const clientId = String(msg.clientId || "").trim();
           const stored = clientId ? participantsById.get(clientId) : null;
           const name = String(msg.name || stored?.name || "名無し").trim().slice(0, 24) || "名無し";
@@ -307,56 +419,171 @@ wss.on("connection", (ws) => {
           if (participant.clientId) {
             participantsById.set(participant.clientId, participant);
           }
+        } else {
+          const clientId = String(msg.clientId || "").trim() || `guest_${Math.random().toString(36).slice(2, 10)}`;
+          meta.role = "audience";
+          meta.clientId = clientId;
+        }
+        broadcastState();
+        return;
+      }
+
+      if (msg.type === "admin:mode") {
+        const nextMode = msg.mode === "good" ? "good" : "geo";
+        if (nextMode !== currentMode) {
+          currentMode = nextMode;
+          if (currentMode === "good") {
+            resetGoodGame();
+          }
+          for (const [clientWs] of clients.entries()) {
+            send(clientWs, { type: "modeChanged", payload: { mode: currentMode } });
+          }
         }
         broadcastState();
         return;
       }
 
       if (meta.role === "admin") {
-        if (msg.type === "admin:start") {
-          resetGame();
-          gameState.phase = "active";
-          clearCurrentPins();
-          broadcastState();
-          return;
-        }
-
-        if (msg.type === "admin:reset") {
-          resetGame({ forceRejoin: true });
-          broadcastForceRejoin();
-          broadcastState();
-          return;
-        }
-
-        if (msg.type === "admin:close") {
-          if (gameState.phase !== "active") return;
-          const roundResults = closeCurrentQuestionAndScore();
-
-          const isLast = gameState.currentQuestionIndex >= questions.length - 1;
-          gameState.phase = isLast ? "finished" : "closed";
-
-          for (const [clientWs] of clients.entries()) {
-            send(clientWs, { type: "roundResult", payload: roundResults });
+        if (msg.type === "admin:jumpGeo") {
+          const nextIndex = Number(msg.index);
+          if (Number.isFinite(nextIndex)) {
+            const clamped = Math.max(0, Math.min(questions.length - 1, nextIndex));
+            geoState.currentQuestionIndex = clamped;
+            geoState.phase = "active";
+            clearCurrentPins();
+            broadcastState();
           }
-          broadcastState();
           return;
         }
 
-        if (msg.type === "admin:next") {
-          if (gameState.phase !== "closed") return;
-          if (gameState.currentQuestionIndex >= questions.length - 1) return;
-          gameState.currentQuestionIndex += 1;
-          gameState.phase = "active";
-          clearCurrentPins();
-          broadcastState();
+        if (msg.type === "admin:jumpGood") {
+          const nextIndex = Number(msg.index);
+          if (Number.isFinite(nextIndex)) {
+            const clamped = Math.max(0, Math.min(performers.length - 1, nextIndex));
+            goodState.currentIndex = clamped;
+            goodState.phase = "live";
+            const stat = performerStats[clamped];
+            if (stat) {
+              stat.locked = false;
+            }
+            broadcastState();
+          }
+          return;
+        }
+
+        if (currentMode === "geo") {
+          if (msg.type === "admin:start") {
+            resetGeoGame();
+            geoState.phase = "active";
+            clearCurrentPins();
+            broadcastState();
+            return;
+          }
+
+          if (msg.type === "admin:reset") {
+            resetGeoGame({ forceRejoin: true });
+            broadcastForceRejoin();
+            broadcastState();
+            return;
+          }
+
+          if (msg.type === "admin:close") {
+            if (geoState.phase !== "active") return;
+            const roundResults = closeCurrentQuestionAndScore();
+
+            const isLast = geoState.currentQuestionIndex >= questions.length - 1;
+            geoState.phase = isLast ? "finished" : "closed";
+
+            for (const [clientWs] of clients.entries()) {
+              send(clientWs, { type: "roundResult", payload: roundResults });
+            }
+            broadcastState();
+            return;
+          }
+
+          if (msg.type === "admin:next") {
+            if (geoState.phase !== "closed") return;
+            if (geoState.currentQuestionIndex >= questions.length - 1) return;
+            geoState.currentQuestionIndex += 1;
+            geoState.phase = "active";
+            clearCurrentPins();
+            broadcastState();
+            return;
+          }
+
+          return;
+        }
+
+        if (currentMode === "good") {
+          if (msg.type === "admin:resetGood") {
+            resetGoodGame();
+            broadcastState();
+            return;
+          }
+
+          if (msg.type === "admin:practice") {
+            if (goodState.phase !== "waiting") return;
+            goodState.phase = "practice";
+            goodState.currentIndex = -1;
+            broadcastState();
+            return;
+          }
+
+          if (msg.type === "admin:start") {
+            resetStats();
+            goodState.phase = "live";
+            goodState.currentIndex = performers.length > 0 ? 0 : -1;
+            broadcastState();
+            return;
+          }
+
+          if (msg.type === "admin:next") {
+            if (goodState.phase !== "live") return;
+            lockCurrentStats();
+            const isLast = goodState.currentIndex >= performers.length - 1;
+            if (isLast) {
+              goodState.phase = "review";
+            } else {
+              goodState.currentIndex += 1;
+            }
+            broadcastState();
+            return;
+          }
+
+          if (msg.type === "admin:back") {
+            if (goodState.phase === "review") {
+              goodState.phase = "live";
+              goodState.currentIndex = performers.length - 1;
+              const stat = performerStats[goodState.currentIndex];
+              if (stat) stat.locked = false;
+              broadcastState();
+              return;
+            }
+
+            if (goodState.phase !== "live") return;
+            if (goodState.currentIndex <= 0) return;
+            goodState.currentIndex -= 1;
+            const stat = performerStats[goodState.currentIndex];
+            if (stat) stat.locked = false;
+            broadcastState();
+            return;
+          }
+
+          if (msg.type === "admin:publish") {
+            if (goodState.phase !== "review") return;
+            goodState.phase = "results";
+            broadcastState();
+            return;
+          }
+
           return;
         }
 
         return;
       }
 
-      if (meta.role === "participant" && msg.type === "answer:update") {
-        if (gameState.phase !== "active") {
+      if (currentMode === "geo" && meta.role === "participant" && msg.type === "answer:update") {
+        if (geoState.phase !== "active") {
           send(ws, { type: "error", payload: "現在は回答を受け付けていません。" });
           return;
         }
@@ -370,7 +597,23 @@ wss.on("connection", (ws) => {
         }
 
         meta.currentPin = { lat, lng };
-        meta.answers[gameState.currentQuestionIndex] = { lat, lng };
+        meta.answers[geoState.currentQuestionIndex] = { lat, lng };
+        broadcastState();
+      }
+
+      if (currentMode === "good" && msg.type === "good") {
+        if (goodState.phase === "practice") {
+          return;
+        }
+        if (goodState.phase !== "live") {
+          return;
+        }
+        if (!Number.isFinite(goodState.currentIndex) || goodState.currentIndex < 0) return;
+        const stat = performerStats[goodState.currentIndex];
+        if (!stat || !meta.clientId) return;
+        if (stat.voters.has(meta.clientId)) return;
+        if (meta.role === "admin" || meta.role === "guest") return;
+        stat.voters.add(meta.clientId);
         broadcastState();
       }
     } catch {

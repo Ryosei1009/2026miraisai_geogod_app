@@ -18,6 +18,10 @@ body.theme-lava {
 	color: var(--text-color);
 }
 
+body.good-flash {
+	background: radial-gradient(circle at top, rgba(0, 255, 135, 0.25), rgba(1, 1, 11, 0.95) 60%);
+}
+
 .text-primary {
 	color: var(--text-color);
 }
