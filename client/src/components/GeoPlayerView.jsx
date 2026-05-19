@@ -1,68 +1,14 @@
-import { useEffect } from "react";
-import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from "react-leaflet";
-import L from "leaflet";
-import marker2x from "leaflet/dist/images/marker-icon-2x.png";
-import marker from "leaflet/dist/images/marker-icon.png";
-import shadow from "leaflet/dist/images/marker-shadow.png";
+import { useMemo } from "react";
+import { GoogleMap, MarkerF, useJsApiLoader } from "@react-google-maps/api";
 
-L.Icon.Default.mergeOptions({
-    iconRetinaUrl: marker2x,
-    iconUrl: marker,
-    shadowUrl: shadow
-});
-
-const markerIcon = L.icon({
-    iconRetinaUrl: marker2x,
-    iconUrl: marker,
-    shadowUrl: shadow,
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41]
-});
-
-const playerPinIcon = L.divIcon({
-    className: "",
-    html: '<div style="width:18px;height:18px;background:var(--main-color);border:2px solid var(--text-color);border-radius:50%;box-shadow:0 0 6px rgba(32,35,42,0.35);"></div>',
-    iconSize: [18, 18],
-    iconAnchor: [9, 9]
-});
-
-const JAPAN_CENTER = [36, 138];
+const JAPAN_CENTER = { lat: 36, lng: 138 };
 const JAPAN_ZOOM = 5;
 
-function MapClickLayer({ enabled, onPick }) {
-    useMapEvents({
-        click(e) {
-            if (!enabled) return;
-            onPick({ lat: e.latlng.lat, lng: e.latlng.lng });
-        }
-    });
-    return null;
-}
-
-function MapSizeFixer() {
-    const map = useMap();
-
-    useEffect(() => {
-        const refresh = () => map.invalidateSize({ pan: false, debounceMoveend: true });
-
-        refresh();
-        const t1 = window.setTimeout(refresh, 120);
-        const t2 = window.setTimeout(refresh, 300);
-
-        const onResize = () => refresh();
-        window.addEventListener("resize", onResize);
-
-        return () => {
-            window.clearTimeout(t1);
-            window.clearTimeout(t2);
-            window.removeEventListener("resize", onResize);
-        };
-    }, [map]);
-
-    return null;
-}
+const mapOptions = {
+    fullscreenControl: false,
+    mapTypeControl: false,
+    streetViewControl: false
+};
 
 export default function GeoPlayerView({ phase, player, currentCategory, playerAnswer, pin, onPick, canAnswer, revealedAnswer, error, formatDistance }) {
     const scoreBucket = player?.scores || { trial: 0, japan: 0, world: 0 };
@@ -70,6 +16,36 @@ export default function GeoPlayerView({ phase, player, currentCategory, playerAn
     const activeKey = player?.currentCategory || currentCategory || "trial";
     const activeLabel = scoreLabels[activeKey] || "合計";
     const activeScore = player?.currentCategoryScore ?? scoreBucket[activeKey] ?? 0;
+    const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_KEY;
+    const isKeyMissing = !mapsKey;
+
+    const { isLoaded, loadError } = useJsApiLoader({
+        id: "google-map-script",
+        googleMapsApiKey: mapsKey || "",
+        language: "ja",
+        region: "JP"
+    });
+
+    const playerPinIcon = useMemo(() => {
+        if (!isLoaded || !window.google?.maps) return undefined;
+        return {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 7,
+            fillColor: "#2f8bfd",
+            fillOpacity: 0.95,
+            strokeColor: "#ffffff",
+            strokeWeight: 2
+        };
+    }, [isLoaded]);
+
+    const handleMapClick = (event) => {
+        if (!canAnswer) return;
+        const lat = event.latLng?.lat();
+        const lng = event.latLng?.lng();
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+        onPick({ lat, lng });
+    };
+
     return (
         <main className="page-shell min-h-screen p-3 md:p-6">
             <div className="mx-auto grid max-w-7xl grid-cols-1 gap-4 lg:grid-cols-12">
@@ -89,18 +65,43 @@ export default function GeoPlayerView({ phase, player, currentCategory, playerAn
 
                     {(phase === "active" || phase === "closed" || phase === "finished") && (
                         <div className="relative">
-                            <MapContainer center={JAPAN_CENTER} zoom={JAPAN_ZOOM} className="h-[520px] w-full md:h-[640px] rounded-t-xl">
-                                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
-                                <MapSizeFixer />
-                                <MapClickLayer enabled={canAnswer} onPick={onPick} />
-                                {pin && <Marker position={[pin.lat, pin.lng]} icon={markerIcon} />}
-                                {phase === "closed" && revealedAnswer && (
-                                    <Marker position={[revealedAnswer.lat, revealedAnswer.lng]} icon={markerIcon} />
-                                )}
-                                {phase === "closed" && playerAnswer && (
-                                    <Marker position={[playerAnswer.lat, playerAnswer.lng]} icon={playerPinIcon} />
-                                )}
-                            </MapContainer>
+                            {isKeyMissing && (
+                                <div className="flex h-[520px] w-full items-center justify-center rounded-t-xl bg-card p-6 text-center md:h-[640px]">
+                                    <div>
+                                        <h3 className="text-2xl font-extrabold text-primary">Google Maps APIキーが未設定です</h3>
+                                        <p className="mt-2 text-muted">.env に VITE_GOOGLE_MAPS_KEY を設定してください。</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {!isKeyMissing && loadError && (
+                                <div className="flex h-[520px] w-full items-center justify-center rounded-t-xl bg-card p-6 text-center md:h-[640px]">
+                                    <div>
+                                        <h3 className="text-2xl font-extrabold text-primary">地図の読み込みに失敗しました</h3>
+                                        <p className="mt-2 text-muted">APIキーやドメイン設定をご確認ください。</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {!isKeyMissing && !loadError && !isLoaded && (
+                                <div className="flex h-[520px] w-full items-center justify-center rounded-t-xl bg-card p-6 text-center md:h-[640px]">
+                                    <p className="text-muted">地図読み込み中...</p>
+                                </div>
+                            )}
+
+                            {!isKeyMissing && !loadError && isLoaded && (
+                                <GoogleMap
+                                    center={JAPAN_CENTER}
+                                    zoom={JAPAN_ZOOM}
+                                    mapContainerClassName="h-[520px] w-full md:h-[640px] rounded-t-xl"
+                                    options={mapOptions}
+                                    onClick={handleMapClick}
+                                >
+                                    {pin && <MarkerF position={pin} />}
+                                    {phase === "closed" && revealedAnswer && <MarkerF position={revealedAnswer} />}
+                                    {phase === "closed" && playerAnswer && <MarkerF position={playerAnswer} icon={playerPinIcon} />}
+                                </GoogleMap>
+                            )}
 
                             <div className="bg-card rounded-b-xl p-3 border-b-4 border-[var(--main-color)]">
                                 <h2 className="text-xl font-extrabold text-primary mb-2">参加者: {player?.name || "-"}</h2>
