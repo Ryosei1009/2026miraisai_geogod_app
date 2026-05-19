@@ -26,13 +26,13 @@ export default function GeoPlayerView({ phase, player, currentCategory, playerAn
         region: "JP"
     });
 
-    const playerPinIcon = useMemo(() => {
+    const correctPinIcon = useMemo(() => {
         if (!isLoaded || !window.google?.maps) return undefined;
         return {
-            path: window.google.maps.SymbolPath.CIRCLE,
+            path: window.google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
             scale: 7,
-            fillColor: "#2f8bfd",
-            fillOpacity: 0.95,
+            fillColor: "#22c55e",
+            fillOpacity: 0.98,
             strokeColor: "#ffffff",
             strokeWeight: 2
         };
@@ -47,74 +47,78 @@ export default function GeoPlayerView({ phase, player, currentCategory, playerAn
     };
 
     return (
-        <main className="page-shell min-h-screen p-3 md:p-6">
-            <div className="mx-auto grid max-w-7xl grid-cols-1 gap-4 lg:grid-cols-12">
-                <section className="glass-card px-5 lg:col-span-4">
-                    {error && <p className="alert-error mt-4 rounded-lg p-2 text-sm">{error}</p>}
-                </section>
+        <main className="page-shell min-h-screen">
+            <div className="relative h-screen w-full">
+                {isKeyMissing && (
+                    <div className="flex h-full w-full items-center justify-center bg-card p-6 text-center">
+                        <div>
+                            <h3 className="text-2xl font-extrabold text-primary">Google Maps APIキーが未設定です</h3>
+                            <p className="mt-2 text-muted">.env に VITE_GOOGLE_MAPS_KEY を設定してください。</p>
+                        </div>
+                    </div>
+                )}
 
-                <section className="glass-card overflow-hidden lg:col-span-8">
+                {!isKeyMissing && loadError && (
+                    <div className="flex h-full w-full items-center justify-center bg-card p-6 text-center">
+                        <div>
+                            <h3 className="text-2xl font-extrabold text-primary">地図の読み込みに失敗しました</h3>
+                            <p className="mt-2 text-muted">APIキーやドメイン設定をご確認ください。</p>
+                        </div>
+                    </div>
+                )}
+
+                {!isKeyMissing && !loadError && !isLoaded && (
+                    <div className="flex h-full w-full items-center justify-center bg-card p-6 text-center">
+                        <p className="text-muted">地図読み込み中...</p>
+                    </div>
+                )}
+
+                {!isKeyMissing && !loadError && isLoaded && (
+                    <GoogleMap
+                        center={JAPAN_CENTER}
+                        zoom={JAPAN_ZOOM}
+                        mapContainerClassName="h-full w-full"
+                        options={mapOptions}
+                        onClick={handleMapClick}
+                    >
+                        {pin && <MarkerF position={pin} />}
+                        {phase === "closed" && revealedAnswer && <MarkerF position={revealedAnswer} icon={correctPinIcon} />}
+                        {phase === "closed" && playerAnswer && <MarkerF position={playerAnswer} />}
+                    </GoogleMap>
+                )}
+
+                <div className="pointer-events-none absolute inset-0 flex flex-col justify-end p-2 md:p-6">
+                    {phase !== "waiting" && (
+                        <div className="pointer-events-auto w-full max-w-none space-y-2 md:max-w-sm">
+                            {error && <p className="alert-error rounded-lg p-2 text-sm">{error}</p>}
+                            <div className="rounded-2xl border border-[var(--main-color)]/20 bg-[#050a30]/95 p-3 shadow-lg backdrop-blur md:p-4">
+                                <div className="mt-1 md:mt-2 flex ">
+                                    <div className="w-2/3">
+                                        <p className="text-[11px] uppercase tracking-widest text-muted">参加者</p>
+                                        <h2 className="text-xl font-extrabold text-primary md:text-2xl">{player?.name || "-"}</h2>
+                                    </div>
+                                    <div className="w-1/3">
+                                        <p className="text-[11px] uppercase tracking-widest text-muted">現在の{activeLabel}スコア</p>
+                                        <p className="text-3xl font-extrabold text-accent -mt-1 md:text-4xl">{activeScore}</p>
+                                    </div>
+                                </div>
+                                <div className="mt-2 grid gap-1 text-muted mt-3 grid-cols-2 text-sm">
+                                    <p>前問距離: {formatDistance(player?.lastRound?.distanceKm)}</p>
+                                    <p>前問得点: {player?.lastRound?.gained ?? 0}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {phase === "waiting" && (
-                        <div className="flex h-full min-h-[520px] items-center justify-center p-8 text-center">
-                            <div>
+                        <div className="pointer-events-auto mx-auto w-full max-w-xl p-2 md:pb-0">
+                            <div className="rounded-2xl border border-[var(--main-color)]/20 bg-[var(--card-bg)]/95 p-6 text-center shadow-lg backdrop-blur">
                                 <h3 className="text-3xl font-extrabold text-primary">開始待機中</h3>
                                 <p className="mt-3 text-muted">運営がゲーム開始を押すまでお待ちください。</p>
                             </div>
                         </div>
                     )}
-
-                    {(phase === "active" || phase === "closed" || phase === "finished") && (
-                        <div className="relative">
-                            {isKeyMissing && (
-                                <div className="flex h-[520px] w-full items-center justify-center rounded-t-xl bg-card p-6 text-center md:h-[640px]">
-                                    <div>
-                                        <h3 className="text-2xl font-extrabold text-primary">Google Maps APIキーが未設定です</h3>
-                                        <p className="mt-2 text-muted">.env に VITE_GOOGLE_MAPS_KEY を設定してください。</p>
-                                    </div>
-                                </div>
-                            )}
-
-                            {!isKeyMissing && loadError && (
-                                <div className="flex h-[520px] w-full items-center justify-center rounded-t-xl bg-card p-6 text-center md:h-[640px]">
-                                    <div>
-                                        <h3 className="text-2xl font-extrabold text-primary">地図の読み込みに失敗しました</h3>
-                                        <p className="mt-2 text-muted">APIキーやドメイン設定をご確認ください。</p>
-                                    </div>
-                                </div>
-                            )}
-
-                            {!isKeyMissing && !loadError && !isLoaded && (
-                                <div className="flex h-[520px] w-full items-center justify-center rounded-t-xl bg-card p-6 text-center md:h-[640px]">
-                                    <p className="text-muted">地図読み込み中...</p>
-                                </div>
-                            )}
-
-                            {!isKeyMissing && !loadError && isLoaded && (
-                                <GoogleMap
-                                    center={JAPAN_CENTER}
-                                    zoom={JAPAN_ZOOM}
-                                    mapContainerClassName="h-[520px] w-full md:h-[640px] rounded-t-xl"
-                                    options={mapOptions}
-                                    onClick={handleMapClick}
-                                >
-                                    {pin && <MarkerF position={pin} />}
-                                    {phase === "closed" && revealedAnswer && <MarkerF position={revealedAnswer} />}
-                                    {phase === "closed" && playerAnswer && <MarkerF position={playerAnswer} icon={playerPinIcon} />}
-                                </GoogleMap>
-                            )}
-
-                            <div className="bg-card rounded-b-xl p-3 border-b-4 border-[var(--main-color)]">
-                                <h2 className="text-xl font-extrabold text-primary mb-2">参加者: {player?.name || "-"}</h2>
-                                <p className="text-sm text-muted">現在の{activeLabel}スコア</p>
-                                <p className="text-3xl font-extrabold text-accent -mt-1 mb-1">{activeScore}</p>
-                                <div className="flex">
-                                    <p className="text-sm text-muted w-1/2">前問距離: {formatDistance(player?.lastRound?.distanceKm)}</p>
-                                    <p className="text-sm text-muted w-1/2">前問得点: {player?.lastRound?.gained ?? 0}</p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </section>
+                </div>
             </div>
         </main>
     );
