@@ -5,9 +5,17 @@ const JAPAN_CENTER = { lat: 36, lng: 138 };
 const JAPAN_ZOOM = 5;
 
 const mapOptions = {
+    clickableIcons: false,
     fullscreenControl: false,
     mapTypeControl: false,
-    streetViewControl: false
+    streetViewControl: false,
+    styles: [
+        {
+            featureType: "poi",
+            elementType: "labels",
+            stylers: [{ visibility: "off" }]
+        }
+    ]
 };
 
 export default function GeoPlayerView({ phase, player, currentCategory, playerAnswer, pin, onPick, canAnswer, revealedAnswer, error, formatDistance }) {
