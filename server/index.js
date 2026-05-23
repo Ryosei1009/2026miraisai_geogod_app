@@ -112,14 +112,12 @@ function toleranceKmForCategory(category) {
   return 10;
 }
 
-function getParticipants() {
-  return [...clients.entries()]
-    .filter(([, meta]) => meta.role === "participant")
-    .map(([ws, meta]) => ({ ws, ...meta }));
+function getAllParticipants() {
+  return [...participantsById.values()].filter((meta) => meta.role === "participant");
 }
 
 function buildLeaderboard() {
-  return getParticipants()
+  return getAllParticipants()
     .map((p) => ({
       name: p.name,
       totalScore: totalScore(p.scores),
@@ -129,7 +127,7 @@ function buildLeaderboard() {
 }
 
 function buildRanking() {
-  return getParticipants()
+  return getAllParticipants()
     .map((p) => ({
       name: p.name,
       trialScore: p.scores.trial,
@@ -515,7 +513,8 @@ function closeCurrentQuestionAndScore() {
   const q = questions[geoState.currentQuestionIndex];
   const resultRows = [];
 
-  for (const { ws, name, currentPin, answers, scores } of getParticipants()) {
+  for (const participant of getAllParticipants()) {
+    const { name, currentPin, answers, scores } = participant;
     const qCategory = q.category || "japan";
     const ans = answers[geoState.currentQuestionIndex] || currentPin;
     let gained = 0;
@@ -527,20 +526,19 @@ function closeCurrentQuestionAndScore() {
       gained = distanceKm <= toleranceKm ? scoreFromDistance(distanceKm, qCategory) : 0;
     }
 
-    const updated = clients.get(ws);
-    updated.scores[qCategory] += gained;
-    updated.lastRound = {
+    participant.scores[qCategory] += gained;
+    participant.lastRound = {
       questionId: q.id,
       gained,
       distanceKm
     };
-    updated.currentPin = null;
+    participant.currentPin = null;
 
     resultRows.push({
       name,
       gained,
       distanceKm,
-      totalScore: totalScore(updated.scores)
+      totalScore: totalScore(participant.scores)
     });
   }
 
@@ -548,10 +546,8 @@ function closeCurrentQuestionAndScore() {
 }
 
 function clearCurrentPins() {
-  for (const [, meta] of clients.entries()) {
-    if (meta.role === "participant") {
-      meta.currentPin = null;
-    }
+  for (const meta of getAllParticipants()) {
+    meta.currentPin = null;
   }
 }
 
@@ -570,16 +566,14 @@ function resetGeoGame({ forceRejoin = false } = {}) {
     gameId = createGameId();
     participantsById.clear();
   }
-  for (const [, meta] of clients.entries()) {
-    if (meta.role === "participant") {
-      meta.scores = blankScores();
-      meta.answers = {};
-      meta.lastRound = null;
-      meta.currentPin = null;
-      if (forceRejoin) {
-        meta.role = "guest";
-        meta.name = "";
-      }
+  for (const meta of getAllParticipants()) {
+    meta.scores = blankScores();
+    meta.answers = {};
+    meta.lastRound = null;
+    meta.currentPin = null;
+    if (forceRejoin) {
+      meta.role = "guest";
+      meta.name = "";
     }
   }
 }
