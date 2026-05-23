@@ -4,6 +4,57 @@ import ConfirmModal from "./components/ConfirmModal";
 import PlayerView from "./components/PlayerView";
 import RankingView from "./components/RankingView";
 
+const STORAGE_KEYS = {
+    clientId: "geoguessr.clientId",
+    name: "geoguessr.name",
+    gameId: "geoguessr.gameId"
+};
+
+const getStored = (key) => window.localStorage.getItem(key) || "";
+const setStored = (key, value) => window.localStorage.setItem(key, value);
+const clearStored = () => {
+    window.localStorage.removeItem(STORAGE_KEYS.clientId);
+    window.localStorage.removeItem(STORAGE_KEYS.name);
+    window.localStorage.removeItem(STORAGE_KEYS.gameId);
+};
+
+const getOrCreateClientId = () => {
+    const existing = getStored(STORAGE_KEYS.clientId);
+    if (existing) return existing;
+    const fresh = `client_${Math.random().toString(36).slice(2, 10)}`;
+    setStored(STORAGE_KEYS.clientId, fresh);
+    return fresh;
+};
+
+const buildInitialGameState = () => ({
+    mode: "geo",
+    phase: "waiting",
+    selfRole: "guest",
+    currentQuestionIndex: 0,
+    totalQuestions: 0,
+    questionList: [],
+    leaderboard: [],
+    ranking: [],
+    scoreMode: "separate",
+    currentQuestion: null,
+    currentCategory: null,
+    revealedAnswer: null,
+    player: null,
+    currentIndex: -1,
+    totalPerformers: 0,
+    performers: [],
+    stats: [],
+    audienceCount: 0,
+    hasVotedCurrent: false
+});
+
+const categoryFromIndex = (index) => {
+    if (index === 0) return "trial";
+    if (index >= 1 && index <= 5) return "japan";
+    if (index >= 6) return "world";
+    return null;
+};
+
 function formatDistance(v) {
     if (typeof v !== "number") return "-";
     return `${v.toFixed(1)} km`;
@@ -33,55 +84,16 @@ function wsUrlFromWindow() {
 }
 
 export default function App() {
-    const isAdmin = useMemo(() => new URLSearchParams(window.location.search).get("admin0173") === "1", []);
     const isRankView = useMemo(() => new URLSearchParams(window.location.search).get("rank") === "1", []);
-
-    const storageKeys = {
-        clientId: "geoguessr.clientId",
-        name: "geoguessr.name",
-        gameId: "geoguessr.gameId"
-    };
-
-    const getStored = (key) => window.localStorage.getItem(key) || "";
-    const setStored = (key, value) => window.localStorage.setItem(key, value);
-    const clearStored = () => {
-        window.localStorage.removeItem(storageKeys.clientId);
-        window.localStorage.removeItem(storageKeys.name);
-        window.localStorage.removeItem(storageKeys.gameId);
-    };
-
-    const getOrCreateClientId = () => {
-        const existing = getStored(storageKeys.clientId);
-        if (existing) return existing;
-        const fresh = `client_${Math.random().toString(36).slice(2, 10)}`;
-        setStored(storageKeys.clientId, fresh);
-        return fresh;
-    };
 
     const [socketReady, setSocketReady] = useState(false);
     const [joined, setJoined] = useState(false);
     const [name, setName] = useState("");
+    const [wantsAdmin, setWantsAdmin] = useState(false);
+    const [adminKey, setAdminKey] = useState("");
+    const [showAdminPanel, setShowAdminPanel] = useState(false);
     const [pin, setPin] = useState(null);
-    const [gameState, setGameState] = useState({
-        mode: "geo",
-        phase: "waiting",
-        currentQuestionIndex: 0,
-        totalQuestions: 0,
-        questionList: [],
-        leaderboard: [],
-        ranking: [],
-        scoreMode: "separate",
-        currentQuestion: null,
-        currentCategory: null,
-        revealedAnswer: null,
-        player: null,
-        currentIndex: -1,
-        totalPerformers: 0,
-        performers: [],
-        stats: [],
-        audienceCount: 0,
-        hasVotedCurrent: false
-    });
+    const [gameState, setGameState] = useState(buildInitialGameState);
     const [roundResult, setRoundResult] = useState([]);
     const [error, setError] = useState("");
     const [confirmState, setConfirmState] = useState({
@@ -94,23 +106,60 @@ export default function App() {
     });
     const [goodFlash, setGoodFlash] = useState(false);
 
+    const isAdmin = gameState.selfRole === "admin";
+
     const wsRef = useRef(null);
     const joinedRef = useRef(false);
     const autoJoinRef = useRef(false);
     const lastModeRef = useRef("geo");
     const desiredModeRef = useRef(null);
+    const pendingAdminRef = useRef(false);
+    const isAdminRef = useRef(false);
+    const wantsAdminRef = useRef(false);
 
     useEffect(() => {
         joinedRef.current = joined;
     }, [joined]);
 
     useEffect(() => {
-        const savedName = getStored(storageKeys.name);
+        isAdminRef.current = isAdmin;
+    }, [isAdmin]);
+
+    useEffect(() => {
+        wantsAdminRef.current = wantsAdmin;
+    }, [wantsAdmin]);
+
+    useEffect(() => {
+        const savedName = getStored(STORAGE_KEYS.name);
         if (savedName && !isAdmin) {
             setName(savedName);
         }
     }, [isAdmin]);
-    
+
+    useEffect(() => {
+        if (!wantsAdmin) {
+            setAdminKey("");
+        }
+    }, [wantsAdmin]);
+
+    useEffect(() => {
+        if (!showAdminPanel) {
+            setWantsAdmin(false);
+        }
+    }, [showAdminPanel]);
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("admin") === "1") {
+            setShowAdminPanel(true);
+            setWantsAdmin(true);
+        }
+    }, []);
+
+    const send = (payload) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        wsRef.current.send(JSON.stringify(payload));
+    };
 
     useEffect(() => {
         const ws = new WebSocket(wsUrlFromWindow());
@@ -125,7 +174,17 @@ export default function App() {
                 const payload = msg.payload || {};
                 setGameState(payload);
 
-                if (isAdmin && desiredModeRef.current && payload.mode && payload.mode !== desiredModeRef.current) {
+                if (pendingAdminRef.current) {
+                    if (payload.selfRole === "admin") {
+                        pendingAdminRef.current = false;
+                    } else {
+                        pendingAdminRef.current = false;
+                        setJoined(false);
+                        setError("管理者認証に失敗しました。");
+                    }
+                }
+
+                if (isAdminRef.current && desiredModeRef.current && payload.mode && payload.mode !== desiredModeRef.current) {
                     send({ type: "admin:mode", mode: desiredModeRef.current });
                 }
 
@@ -135,7 +194,7 @@ export default function App() {
 
                 if (payload.mode === "geo") {
                     const incomingGameId = payload.gameId || "";
-                    const storedGameId = getStored(storageKeys.gameId);
+                    const storedGameId = getStored(STORAGE_KEYS.gameId);
                     if (incomingGameId && storedGameId && incomingGameId !== storedGameId) {
                         clearStored();
                         setJoined(false);
@@ -143,10 +202,10 @@ export default function App() {
                         autoJoinRef.current = false;
                     }
                     if (incomingGameId && incomingGameId !== storedGameId) {
-                        setStored(storageKeys.gameId, incomingGameId);
+                        setStored(STORAGE_KEYS.gameId, incomingGameId);
                     }
 
-                    if (!isAdmin && joinedRef.current && !payload.player) {
+                    if (!isAdminRef.current && joinedRef.current && !payload.player) {
                         setJoined(false);
                         setPin(null);
                     }
@@ -157,9 +216,9 @@ export default function App() {
                         setPin(null);
                     }
 
-                    if (!isAdmin && !joinedRef.current && !autoJoinRef.current) {
-                        const clientId = getStored(storageKeys.clientId);
-                        const savedName = getStored(storageKeys.name);
+                    if (!isAdminRef.current && !joinedRef.current && !autoJoinRef.current && !wantsAdminRef.current) {
+                        const clientId = getStored(STORAGE_KEYS.clientId);
+                        const savedName = getStored(STORAGE_KEYS.name);
                         if (clientId && savedName && incomingGameId) {
                             autoJoinRef.current = true;
                             send({ type: "join", role: "participant", name: savedName, clientId });
@@ -191,6 +250,10 @@ export default function App() {
             }
 
             if (msg.type === "error") {
+                if (pendingAdminRef.current) {
+                    pendingAdminRef.current = false;
+                    setJoined(false);
+                }
                 setError(msg.payload || "不明なエラー");
             }
         };
@@ -215,14 +278,9 @@ export default function App() {
     const currentIndex = Number.isFinite(gameState.currentIndex) ? gameState.currentIndex : -1;
     const stats = gameState.stats || [];
     const player = gameState.player;
-    const canGood = !isAdmin && joined && mode === "good" && (phase === "practice" || phase === "live");
+    const canGood = !isAdmin && joined && mode === "good" && phase === "live";
     const canAnswer = !isAdmin && mode === "geo" && phase === "active";
     const revealedAnswer = gameState.revealedAnswer;
-
-    const send = (payload) => {
-        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-        wsRef.current.send(JSON.stringify(payload));
-    };
 
     const handleModeChange = (nextMode, { updateState } = { updateState: false }) => {
         if (!nextMode) return;
@@ -230,14 +288,14 @@ export default function App() {
         if (updateState) {
             setGameState((prev) => ({ ...prev, mode: nextMode }));
         }
-        if (!isAdmin) {
+        if (!isAdmin && !wantsAdminRef.current) {
             if (nextMode === "good") {
                 const clientId = getOrCreateClientId();
                 send({ type: "join", role: "audience", clientId });
                 setJoined(true);
             } else if (nextMode === "geo") {
-                const clientId = getStored(storageKeys.clientId);
-                const savedName = getStored(storageKeys.name) || name;
+                const clientId = getStored(STORAGE_KEYS.clientId);
+                const savedName = getStored(STORAGE_KEYS.name) || name;
                 if (clientId && savedName) {
                     send({ type: "join", role: "participant", name: savedName, clientId });
                     setJoined(true);
@@ -251,14 +309,19 @@ export default function App() {
 
     const joinAs = () => {
         const clientId = getOrCreateClientId();
+        const role = wantsAdmin ? "admin" : mode === "geo" ? "participant" : "audience";
+        if (wantsAdmin) {
+            pendingAdminRef.current = true;
+        }
         send({
             type: "join",
-            role: isAdmin ? "admin" : mode === "geo" ? "participant" : "audience",
-            name: isAdmin || mode !== "geo" ? null : name,
-            clientId: isAdmin ? null : clientId
+            role,
+            name: wantsAdmin || mode !== "geo" ? null : name,
+            clientId: wantsAdmin ? null : clientId,
+            adminKey: wantsAdmin ? adminKey : undefined
         });
-        if (!isAdmin && mode === "geo") {
-            setStored(storageKeys.name, name);
+        if (!wantsAdmin && mode === "geo") {
+            setStored(STORAGE_KEYS.name, name);
         }
         setJoined(true);
         setError("");
@@ -288,6 +351,10 @@ export default function App() {
         });
     };
 
+    const resetConfirmState = () => {
+        setConfirmState({ open: false, title: "", message: "", confirmLabel: "", cancelLabel: "", payload: null });
+    };
+
     const handleConfirm = () => {
         if (confirmState.payload) {
             send(confirmState.payload);
@@ -306,32 +373,18 @@ export default function App() {
                 handleModeChange(nextMode, { updateState: false });
             }
         }
-        setConfirmState({ open: false, title: "", message: "", confirmLabel: "", cancelLabel: "", payload: null });
+        resetConfirmState();
     };
 
     const handleCancel = () => {
-        setConfirmState({ open: false, title: "", message: "", confirmLabel: "", cancelLabel: "", payload: null });
+        resetConfirmState();
     };
 
     useEffect(() => {
-        if (mode !== "good") {
-            setGoodFlash(false);
-            return;
-        }
-        if (phase === "live") {
+        if (mode !== "good" || phase !== "live") {
             setGoodFlash(false);
         }
     }, [mode, phase, currentIndex]);
-
-    useEffect(() => {
-        if (mode !== "good") {
-            setGoodFlash(false);
-            return;
-        }
-        if (phase !== "live" && phase !== "practice") {
-            setGoodFlash(false);
-        }
-    }, [mode, phase]);
 
     useEffect(() => {
         if (goodFlash) {
@@ -344,6 +397,79 @@ export default function App() {
             document.body.classList.remove("good-flash");
         };
     }, [goodFlash]);
+
+    if (!joined) {
+        return (
+            <main className="page-shell min-h-screen p-4 md:p-10">
+                <section className="glass-card mx-auto mt-10 max-w-xl p-8">
+                    <h1 className="mt-2 text-3xl font-extrabold text-primary">{mode === "good" ? "ゴッドタレント" : "ジオゲッサー"}</h1>
+                    <p className="">司会者の指示に従ってください。</p>
+
+                    {!wantsAdmin && mode === "geo" && (
+                        <div className="mt-7">
+                            <label className="block text-sm font-bold text-muted">ニックネーム</label>
+                            <input
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                maxLength={24}
+                                className="input-field mt-2 w-full rounded-xl border px-4 py-3 outline-none ring-0 transition"
+                            />
+                        </div>
+                    )}
+
+                    {!joined && showAdminPanel && (
+                        <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-4">
+                            <label className="block text-sm font-bold text-muted">管理者キー</label>
+                            <input
+                                value={adminKey}
+                                onChange={(e) => setAdminKey(e.target.value)}
+                                type="password"
+                                className="input-field mt-2 w-full rounded-xl border px-4 py-3 outline-none ring-0 transition"
+                            />
+                            <div className="mt-3 flex items-center justify-end gap-2">
+                                <button
+                                    onClick={() => setShowAdminPanel(false)}
+                                    className="rounded-lg border border-white/10 px-3 py-1 text-xs font-semibold text-muted"
+                                >
+                                    閉じる
+                                </button>
+                                <button
+                                    onClick={() => setWantsAdmin(true)}
+                                    className="rounded-lg bg-white/10 px-3 py-1 text-xs font-semibold"
+                                >
+                                    運営者として入る
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    <button
+                        onClick={joinAs}
+                        disabled={
+                            !socketReady ||
+                            (wantsAdmin ? !adminKey.trim() : mode === "geo" && !name.trim())
+                        }
+                        className="btn-main mt-8 w-full rounded-xl px-4 py-3 text-lg font-bold disabled:cursor-not-allowed"
+                    >
+                        {wantsAdmin ? "管理画面に入る" : "参加する"}
+                    </button>
+
+                    <p className="mt-3 text-sm text-muted">接続状態: {socketReady ? "接続済み" : "接続中..."}</p>
+                </section>
+                {!joined && !showAdminPanel && (
+                    <button
+                        onClick={() => {
+                            setShowAdminPanel(true);
+                            setWantsAdmin(true);
+                        }}
+                        className="fixed bottom-4 right-4 rounded-full border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-muted backdrop-blur"
+                    >
+                        運営者
+                    </button>
+                )}
+            </main>
+        );
+    }
 
     if (isRankView) {
         if (!isAdmin) {
@@ -378,39 +504,6 @@ export default function App() {
         );
     }
 
-    if (!joined) {
-        return (
-            <main className="page-shell min-h-screen p-4 md:p-10">
-                <section className="glass-card mx-auto mt-10 max-w-xl p-8">
-                    <h1 className="mt-2 text-3xl font-extrabold text-primary">{mode === "good" ? "ゴッドタレント" : "ジオゲッサー"}</h1>
-
-                    {!isAdmin && mode === "geo" && (
-                        <div className="mt-7">
-                            <label className="block text-sm font-bold text-muted">ニックネーム</label>
-                            <input
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                maxLength={24}
-                                placeholder="例: しの"
-                                className="input-field mt-2 w-full rounded-xl border px-4 py-3 outline-none ring-0 transition"
-                            />
-                        </div>
-                    )}
-
-                    <button
-                        onClick={joinAs}
-                        disabled={!socketReady || (!isAdmin && mode === "geo" && !name.trim())}
-                        className="btn-main mt-8 w-full rounded-xl px-4 py-3 text-lg font-bold disabled:cursor-not-allowed"
-                    >
-                        {isAdmin ? "管理画面に入る" : "参加する"}
-                    </button>
-
-                    <p className="mt-3 text-sm text-muted">接続状態: {socketReady ? "接続済み" : "接続中..."}</p>
-                </section>
-            </main>
-        );
-    }
-
     if (isAdmin) {
         return (
             <>
@@ -442,7 +535,6 @@ export default function App() {
                             "やめる"
                         )
                     }
-                    onPractice={() => confirmAndSend("練習を開始します。よろしいですか？", { type: "admin:practice" }, "練習開始", "やめる")}
                     onStart={() => confirmAndSend("本番を開始します。よろしいですか？", { type: "admin:start" }, "本番開始", "やめる")}
                     onBack={() => confirmAndSend("前の出演者に戻ります。よろしいですか？", { type: "admin:back" }, "戻る", "戻らない")}
                     onJumpGood={(nextIndex) =>
@@ -455,15 +547,16 @@ export default function App() {
                     }
                     onNext={() =>
                         confirmAndSend(
-                            currentIndex >= performers.length - 1
-                                ? "この出演者の集計を締め切って集計確認へ進みますか？"
-                                : "この出演者の集計を締め切って次へ進みますか？",
+                            phase === "live"
+                                ? "この出演者の集計を締め切って締め切り後画面へ進みますか？"
+                                : currentIndex >= performers.length - 1
+                                    ? "待機画面へ戻りますか？"
+                                    : "次の出演者へ進みますか？",
                             { type: "admin:next" },
                             "進む",
                             "進まない"
                         )
                     }
-                    onPublish={() => confirmAndSend("結果発表に進みます。よろしいですか？", { type: "admin:publish" }, "結果発表", "やめる")}
                     onClose={() => confirmAndSend("回答を締切ります。よろしいですか？", { type: "admin:close" })}
                     onReset={() => confirmAndSend("進行を完全にリセットします。参加者は再参加が必要です。続行しますか？", { type: "admin:reset" })}
                     onResetGood={() => confirmAndSend("ゴッドタレントの進行を完全にリセットします。続行しますか？", { type: "admin:resetGood" })}
@@ -490,13 +583,7 @@ export default function App() {
             currentCategory={
                 gameState.currentCategory ||
                 gameState.currentQuestion?.category ||
-                (gameState.currentQuestionIndex === 0
-                    ? "trial"
-                    : gameState.currentQuestionIndex >= 1 && gameState.currentQuestionIndex <= 5
-                        ? "japan"
-                        : gameState.currentQuestionIndex >= 6
-                            ? "world"
-                            : null)
+                categoryFromIndex(gameState.currentQuestionIndex)
             }
             playerAnswer={player?.currentAnswer || null}
             pin={pin}
@@ -512,6 +599,7 @@ export default function App() {
             canGood={canGood}
             error={error}
             formatDistance={formatDistance}
+            socketReady={socketReady}
         />
     );
 }

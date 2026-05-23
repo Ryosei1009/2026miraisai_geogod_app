@@ -6,21 +6,13 @@ export default function RankingView({ ranking, scoreMode, currentCategory, socke
     const topThree = ranking.slice(0, 3);
     const podiumOrder = [1, 0, 2];
     const rest = ranking.slice(3);
-    // const rest = [
-    //     {name: "Alice", trialScore: 150, japanScore: 200, worldScore: 180, combinedScore: 380},
-    //     {name: "Bob", trialScore: 120, japanScore: 220, worldScore: 160, combinedScore: 380},
-    //     {name: "Charlie", trialScore: 130, japanScore: 210, worldScore: 170, combinedScore: 380},
-    //     {name: "David", trialScore: 110, japanScore: 230, worldScore: 150, combinedScore: 380},
-    //     {name: "Eve", trialScore: 140, japanScore: 190, worldScore: 160, combinedScore: 350},
-    //     {name: "Frank", trialScore: 100, japanScore: 240, worldScore: 140, combinedScore: 380},
-    //     {name: "Grace", trialScore: 160, japanScore: 180, worldScore: 170, combinedScore: 350},
-    //     {name: "Heidi", trialScore: 170, japanScore: 170, worldScore: 160, combinedScore: 330},
-    //     {name: "Ivan", trialScore: 180, japanScore: 160, worldScore: 150, combinedScore: 310},
-    //     {name: "Judy", trialScore: 190, japanScore: 150, worldScore: 140, combinedScore: 290},
-    //     {name: "Mallory", trialScore: 200, japanScore: 140, worldScore: 130, combinedScore: 270},
-    //     {name: "Nina", trialScore: 210, japanScore: 130, worldScore: 120, combinedScore: 250},
-    //     {name: "Oscar", trialScore: 220, japanScore: 120, worldScore: 110, combinedScore: 230},
-    // ];
+
+    const getScoreValue = (row) => {
+        if (isCombined) return row.combinedScore;
+        if (categoryKey === "japan") return row.japanScore;
+        if (categoryKey === "world") return row.worldScore;
+        return row.trialScore;
+    };
 
     return (
         <main className="page-shell min-h-screen p-3 md:p-6">
@@ -49,13 +41,7 @@ export default function RankingView({ ranking, scoreMode, currentCategory, socke
                                     <div className="flex justify-between">
                                         <p className="mt-3 text-lg font-bold text-primary">{row.name}</p>
                                         <p className="mt-1 text-3xl font-extrabold text-accent">
-                                            {isCombined
-                                                ? row.combinedScore
-                                                : categoryKey === "japan"
-                                                    ? row.japanScore
-                                                    : categoryKey === "world"
-                                                        ? row.worldScore
-                                                        : row.trialScore}
+                                            {getScoreValue(row)}
                                         </p>
                                     </div>
                                 </div>
@@ -72,13 +58,7 @@ export default function RankingView({ ranking, scoreMode, currentCategory, socke
                                             <span className="font-semibold text-primary">{row.name}</span>
                                         </div>
                                         <span className="text-lg font-bold text-accent">
-                                            {isCombined
-                                                ? row.combinedScore
-                                                : categoryKey === "japan"
-                                                    ? row.japanScore
-                                                    : categoryKey === "world"
-                                                        ? row.worldScore
-                                                        : row.trialScore}
+                                            {getScoreValue(row)}
                                         </span>
                                     </div>
                                 </li>

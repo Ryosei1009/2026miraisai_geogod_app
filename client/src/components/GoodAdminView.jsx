@@ -7,24 +7,18 @@ export default function GoodAdminView({
     stats,
     audienceCount,
     error,
-    onPractice,
     onStart,
     onBack,
     onNext,
-    onPublish,
     onJumpGood,
     onResetGood
 }) {
-    const phaseLabel =
-        phase === "waiting"
-            ? "待機中"
-            : phase === "practice"
-                ? "練習中"
-                : phase === "live"
-                    ? "本番中"
-                    : phase === "review"
-                        ? "集計確認"
-                        : "結果発表";
+    const phaseLabelMap = {
+        waiting: "待機中",
+        live: "本番中",
+        review: "締め切り後"
+    };
+    const phaseLabel = phaseLabelMap[phase] || "待機中";
 
     const currentPerformer = performers[currentIndex] || null;
     const currentStat = stats[currentIndex] || null;
@@ -79,14 +73,8 @@ export default function GoodAdminView({
 
                     <div className="mt-5 space-y-2">
                         {phase === "waiting" && (
-                            <button className="btn-main w-full rounded-lg px-4 py-3 font-bold" onClick={onPractice}>
-                                練習開始
-                            </button>
-                        )}
-
-                        {(phase === "waiting" || phase === "practice") && (
                             <button className="btn-main w-full rounded-lg px-4 py-3 font-bold" onClick={onStart}>
-                                本番開始
+                                開始
                             </button>
                         )}
 
@@ -104,18 +92,24 @@ export default function GoodAdminView({
                                     onClick={onNext}
                                     disabled={currentIndex < 0}
                                 >
-                                    {currentIndex >= performers.length - 1 ? "集計確認へ" : "次へ進む"}
+                                    締め切り
                                 </button>
                             </div>
                         )}
 
                         {phase === "review" && (
                             <div className="grid grid-cols-2 gap-2">
-                                <button className="btn-dark rounded-lg px-4 py-3 font-bold" onClick={onBack}>
-                                    戻る
+                                <button
+                                    className="btn-dark rounded-lg px-4 py-3 font-bold"
+                                    onClick={onBack}
+                                >
+                                    投票に戻る
                                 </button>
-                                <button className="btn-main rounded-lg px-4 py-3 font-bold" onClick={onPublish}>
-                                    結果発表
+                                <button
+                                    className="btn-main rounded-lg px-4 py-3 font-bold"
+                                    onClick={onNext}
+                                >
+                                    {currentIndex >= performers.length - 1 ? "待機へ" : "次の出演者"}
                                 </button>
                             </div>
                         )}

@@ -19,6 +19,8 @@ const corsOptions = CLIENT_ORIGIN
   ? { origin: CLIENT_ORIGIN, credentials: true }
   : { origin: true };
 
+const ADMIN_KEY = String(process.env.ADMIN_KEY || "").trim();
+
 app.use(cors(corsOptions));
 app.use(express.json());
 
@@ -251,10 +253,11 @@ function buildGoodStateFor(meta) {
 }
 
 function buildStateFor(meta) {
-  if (currentMode === "good") {
-    return buildGoodStateFor(meta);
-  }
-  return buildGeoStateFor(meta);
+  const baseState = currentMode === "good" ? buildGoodStateFor(meta) : buildGeoStateFor(meta);
+  return {
+    ...baseState,
+    selfRole: meta?.role || "guest"
+  };
 }
 
 function send(ws, message) {
@@ -267,6 +270,245 @@ function broadcastState() {
   for (const [ws, meta] of clients.entries()) {
     send(ws, { type: "state", payload: buildStateFor(meta) });
   }
+}
+
+function handleJoinMessage(ws, meta, msg) {
+  if (msg.type !== "join") return false;
+
+  if (msg.role === "admin") {
+    const adminKey = String(msg.adminKey || "").trim();
+    if (!ADMIN_KEY) {
+      send(ws, { type: "error", payload: "管理者キーが未設定です。" });
+      send(ws, { type: "state", payload: buildStateFor(meta) });
+      return true;
+    }
+    if (adminKey !== ADMIN_KEY) {
+      send(ws, { type: "error", payload: "管理者認証に失敗しました。" });
+      send(ws, { type: "state", payload: buildStateFor(meta) });
+      return true;
+    }
+    meta.role = "admin";
+    meta.name = "運営";
+    meta.clientId = null;
+  } else if (msg.role === "participant") {
+    const clientId = String(msg.clientId || "").trim();
+    const stored = clientId ? participantsById.get(clientId) : null;
+    const name = String(msg.name || stored?.name || "名無し").trim().slice(0, 24) || "名無し";
+    const participant = stored || {
+      role: "participant",
+      name,
+      scores: blankScores(),
+      answers: {},
+      lastRound: null,
+      currentPin: null,
+      clientId
+    };
+
+    participant.role = "participant";
+    participant.name = name;
+    participant.clientId = clientId || participant.clientId;
+
+    clients.set(ws, participant);
+    if (participant.clientId) {
+      participantsById.set(participant.clientId, participant);
+    }
+  } else {
+    const clientId = String(msg.clientId || "").trim() || `guest_${Math.random().toString(36).slice(2, 10)}`;
+    meta.role = "audience";
+    meta.clientId = clientId;
+  }
+
+  broadcastState();
+  return true;
+}
+
+function handleAdminModeMessage(msg) {
+  if (msg.type !== "admin:mode") return false;
+  const nextMode = msg.mode === "good" ? "good" : "geo";
+  if (nextMode !== currentMode) {
+    currentMode = nextMode;
+    if (currentMode === "good") {
+      resetGoodGame();
+    }
+    for (const [clientWs] of clients.entries()) {
+      send(clientWs, { type: "modeChanged", payload: { mode: currentMode } });
+    }
+  }
+  broadcastState();
+  return true;
+}
+
+function handleAdminGeoMessage(msg) {
+  if (msg.type === "admin:start") {
+    resetGeoGame();
+    geoState.phase = "active";
+    clearCurrentPins();
+    broadcastState();
+    return true;
+  }
+
+  if (msg.type === "admin:reset") {
+    resetGeoGame({ forceRejoin: true });
+    broadcastForceRejoin();
+    broadcastState();
+    return true;
+  }
+
+  if (msg.type === "admin:close") {
+    if (geoState.phase !== "active") return true;
+    const roundResults = closeCurrentQuestionAndScore();
+
+    const isLast = geoState.currentQuestionIndex >= questions.length - 1;
+    geoState.phase = isLast ? "finished" : "closed";
+
+    for (const [clientWs] of clients.entries()) {
+      send(clientWs, { type: "roundResult", payload: roundResults });
+    }
+    broadcastState();
+    return true;
+  }
+
+  if (msg.type === "admin:next") {
+    if (geoState.phase !== "closed") return true;
+    if (geoState.currentQuestionIndex >= questions.length - 1) return true;
+    geoState.currentQuestionIndex += 1;
+    geoState.phase = "active";
+    clearCurrentPins();
+    broadcastState();
+    return true;
+  }
+
+  return false;
+}
+
+function handleAdminJumpMessage(msg) {
+  if (msg.type === "admin:jumpGeo") {
+    const nextIndex = Number(msg.index);
+    if (Number.isFinite(nextIndex)) {
+      const clamped = Math.max(0, Math.min(questions.length - 1, nextIndex));
+      geoState.currentQuestionIndex = clamped;
+      geoState.phase = "active";
+      clearCurrentPins();
+      broadcastState();
+    }
+    return true;
+  }
+
+  if (msg.type === "admin:jumpGood") {
+    const nextIndex = Number(msg.index);
+    if (Number.isFinite(nextIndex)) {
+      const clamped = Math.max(0, Math.min(performers.length - 1, nextIndex));
+      goodState.currentIndex = clamped;
+      goodState.phase = "live";
+      const stat = performerStats[clamped];
+      if (stat) {
+        stat.locked = false;
+      }
+      broadcastState();
+    }
+    return true;
+  }
+
+  return false;
+}
+
+function handleAdminGoodMessage(msg) {
+  if (msg.type === "admin:resetGood") {
+    resetGoodGame();
+    broadcastState();
+    return true;
+  }
+
+  if (msg.type === "admin:start") {
+    resetStats();
+    goodState.phase = "live";
+    goodState.currentIndex = performers.length > 0 ? 0 : -1;
+    broadcastState();
+    return true;
+  }
+
+  if (msg.type === "admin:next") {
+    if (goodState.phase === "live") {
+      lockCurrentStats();
+      goodState.phase = "review";
+      broadcastState();
+      return true;
+    }
+
+    if (goodState.phase === "review") {
+      const isLast = goodState.currentIndex >= performers.length - 1;
+      if (isLast) {
+        goodState.phase = "waiting";
+        goodState.currentIndex = -1;
+      } else {
+        goodState.currentIndex += 1;
+        goodState.phase = "live";
+        const stat = performerStats[goodState.currentIndex];
+        if (stat) {
+          stat.locked = false;
+        }
+      }
+      broadcastState();
+      return true;
+    }
+    return true;
+  }
+
+  if (msg.type === "admin:back") {
+    if (goodState.phase === "review") {
+      goodState.phase = "live";
+      const stat = performerStats[goodState.currentIndex];
+      if (stat) stat.locked = false;
+      broadcastState();
+      return true;
+    }
+
+    if (goodState.phase !== "live") return true;
+    if (goodState.currentIndex <= 0) return true;
+    goodState.currentIndex -= 1;
+    const stat = performerStats[goodState.currentIndex];
+    if (stat) stat.locked = false;
+    broadcastState();
+    return true;
+  }
+
+  return false;
+}
+
+function handleParticipantAnswer(ws, meta, msg) {
+  if (currentMode !== "geo" || meta.role !== "participant" || msg.type !== "answer:update") return false;
+  if (geoState.phase !== "active") {
+    send(ws, { type: "error", payload: "現在は回答を受け付けていません。" });
+    return true;
+  }
+
+  const lat = Number(msg.lat);
+  const lng = Number(msg.lng);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    send(ws, { type: "error", payload: "座標が不正です。" });
+    return true;
+  }
+
+  meta.currentPin = { lat, lng };
+  meta.answers[geoState.currentQuestionIndex] = { lat, lng };
+  broadcastState();
+  return true;
+}
+
+function handleGoodVote(meta, msg) {
+  if (currentMode !== "good" || msg.type !== "good") return false;
+  if (goodState.phase !== "live") {
+    return true;
+  }
+  if (!Number.isFinite(goodState.currentIndex) || goodState.currentIndex < 0) return true;
+  const stat = performerStats[goodState.currentIndex];
+  if (!stat || !meta.clientId) return true;
+  if (stat.voters.has(meta.clientId)) return true;
+  if (meta.role === "admin" || meta.role === "guest") return true;
+  stat.voters.add(meta.clientId);
+  broadcastState();
+  return true;
 }
 
 function closeCurrentQuestionAndScore() {
@@ -392,230 +634,26 @@ wss.on("connection", (ws) => {
         return;
       }
 
-      if (msg.type === "join") {
-        if (msg.role === "admin") {
-          meta.role = "admin";
-          meta.name = "運営";
-          meta.clientId = null;
-        } else if (msg.role === "participant") {
-          const clientId = String(msg.clientId || "").trim();
-          const stored = clientId ? participantsById.get(clientId) : null;
-          const name = String(msg.name || stored?.name || "名無し").trim().slice(0, 24) || "名無し";
-          const participant = stored || {
-            role: "participant",
-            name,
-            scores: blankScores(),
-            answers: {},
-            lastRound: null,
-            currentPin: null,
-            clientId
-          };
-
-          participant.role = "participant";
-          participant.name = name;
-          participant.clientId = clientId || participant.clientId;
-
-          clients.set(ws, participant);
-          if (participant.clientId) {
-            participantsById.set(participant.clientId, participant);
-          }
-        } else {
-          const clientId = String(msg.clientId || "").trim() || `guest_${Math.random().toString(36).slice(2, 10)}`;
-          meta.role = "audience";
-          meta.clientId = clientId;
-        }
-        broadcastState();
-        return;
-      }
-
-      if (msg.type === "admin:mode") {
-        const nextMode = msg.mode === "good" ? "good" : "geo";
-        if (nextMode !== currentMode) {
-          currentMode = nextMode;
-          if (currentMode === "good") {
-            resetGoodGame();
-          }
-          for (const [clientWs] of clients.entries()) {
-            send(clientWs, { type: "modeChanged", payload: { mode: currentMode } });
-          }
-        }
-        broadcastState();
-        return;
-      }
+      if (handleJoinMessage(ws, meta, msg)) return;
+      if (handleAdminModeMessage(msg)) return;
 
       if (meta.role === "admin") {
-        if (msg.type === "admin:jumpGeo") {
-          const nextIndex = Number(msg.index);
-          if (Number.isFinite(nextIndex)) {
-            const clamped = Math.max(0, Math.min(questions.length - 1, nextIndex));
-            geoState.currentQuestionIndex = clamped;
-            geoState.phase = "active";
-            clearCurrentPins();
-            broadcastState();
-          }
-          return;
-        }
-
-        if (msg.type === "admin:jumpGood") {
-          const nextIndex = Number(msg.index);
-          if (Number.isFinite(nextIndex)) {
-            const clamped = Math.max(0, Math.min(performers.length - 1, nextIndex));
-            goodState.currentIndex = clamped;
-            goodState.phase = "live";
-            const stat = performerStats[clamped];
-            if (stat) {
-              stat.locked = false;
-            }
-            broadcastState();
-          }
-          return;
-        }
-
+        if (handleAdminJumpMessage(msg)) return;
         if (currentMode === "geo") {
-          if (msg.type === "admin:start") {
-            resetGeoGame();
-            geoState.phase = "active";
-            clearCurrentPins();
-            broadcastState();
-            return;
-          }
-
-          if (msg.type === "admin:reset") {
-            resetGeoGame({ forceRejoin: true });
-            broadcastForceRejoin();
-            broadcastState();
-            return;
-          }
-
-          if (msg.type === "admin:close") {
-            if (geoState.phase !== "active") return;
-            const roundResults = closeCurrentQuestionAndScore();
-
-            const isLast = geoState.currentQuestionIndex >= questions.length - 1;
-            geoState.phase = isLast ? "finished" : "closed";
-
-            for (const [clientWs] of clients.entries()) {
-              send(clientWs, { type: "roundResult", payload: roundResults });
-            }
-            broadcastState();
-            return;
-          }
-
-          if (msg.type === "admin:next") {
-            if (geoState.phase !== "closed") return;
-            if (geoState.currentQuestionIndex >= questions.length - 1) return;
-            geoState.currentQuestionIndex += 1;
-            geoState.phase = "active";
-            clearCurrentPins();
-            broadcastState();
-            return;
-          }
-
+          if (handleAdminGeoMessage(msg)) return;
           return;
         }
 
         if (currentMode === "good") {
-          if (msg.type === "admin:resetGood") {
-            resetGoodGame();
-            broadcastState();
-            return;
-          }
-
-          if (msg.type === "admin:practice") {
-            if (goodState.phase !== "waiting") return;
-            goodState.phase = "practice";
-            goodState.currentIndex = -1;
-            broadcastState();
-            return;
-          }
-
-          if (msg.type === "admin:start") {
-            resetStats();
-            goodState.phase = "live";
-            goodState.currentIndex = performers.length > 0 ? 0 : -1;
-            broadcastState();
-            return;
-          }
-
-          if (msg.type === "admin:next") {
-            if (goodState.phase !== "live") return;
-            lockCurrentStats();
-            const isLast = goodState.currentIndex >= performers.length - 1;
-            if (isLast) {
-              goodState.phase = "review";
-            } else {
-              goodState.currentIndex += 1;
-            }
-            broadcastState();
-            return;
-          }
-
-          if (msg.type === "admin:back") {
-            if (goodState.phase === "review") {
-              goodState.phase = "live";
-              goodState.currentIndex = performers.length - 1;
-              const stat = performerStats[goodState.currentIndex];
-              if (stat) stat.locked = false;
-              broadcastState();
-              return;
-            }
-
-            if (goodState.phase !== "live") return;
-            if (goodState.currentIndex <= 0) return;
-            goodState.currentIndex -= 1;
-            const stat = performerStats[goodState.currentIndex];
-            if (stat) stat.locked = false;
-            broadcastState();
-            return;
-          }
-
-          if (msg.type === "admin:publish") {
-            if (goodState.phase !== "review") return;
-            goodState.phase = "results";
-            broadcastState();
-            return;
-          }
-
+          if (handleAdminGoodMessage(msg)) return;
           return;
         }
 
         return;
       }
 
-      if (currentMode === "geo" && meta.role === "participant" && msg.type === "answer:update") {
-        if (geoState.phase !== "active") {
-          send(ws, { type: "error", payload: "現在は回答を受け付けていません。" });
-          return;
-        }
-
-        const lat = Number(msg.lat);
-        const lng = Number(msg.lng);
-
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-          send(ws, { type: "error", payload: "座標が不正です。" });
-          return;
-        }
-
-        meta.currentPin = { lat, lng };
-        meta.answers[geoState.currentQuestionIndex] = { lat, lng };
-        broadcastState();
-      }
-
-      if (currentMode === "good" && msg.type === "good") {
-        if (goodState.phase === "practice") {
-          return;
-        }
-        if (goodState.phase !== "live") {
-          return;
-        }
-        if (!Number.isFinite(goodState.currentIndex) || goodState.currentIndex < 0) return;
-        const stat = performerStats[goodState.currentIndex];
-        if (!stat || !meta.clientId) return;
-        if (stat.voters.has(meta.clientId)) return;
-        if (meta.role === "admin" || meta.role === "guest") return;
-        stat.voters.add(meta.clientId);
-        broadcastState();
-      }
+      if (handleParticipantAnswer(ws, meta, msg)) return;
+      if (handleGoodVote(meta, msg)) return;
     } catch {
       send(ws, { type: "error", payload: "メッセージ解析に失敗しました。" });
     }

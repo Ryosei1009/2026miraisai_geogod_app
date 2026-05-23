@@ -2,9 +2,6 @@ import GeoPlayerView from "./GeoPlayerView";
 import GoodPlayerView from "./GoodPlayerView";
 
 export default function PlayerView({ mode, ...props }) {
-    if (mode === "good") {
-        return <GoodPlayerView {...props} />;
-    }
-
-    return <GeoPlayerView {...props} />;
+    const View = mode === "good" ? GoodPlayerView : GeoPlayerView;
+    return <View {...props} />;
 }

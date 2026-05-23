@@ -14,8 +14,15 @@ export default function GeoAdminView({
     onJumpGeo,
     formatDistance
 }) {
-    const phaseLabel =
-        phase === "waiting" ? "待機中" : phase === "active" ? "回答受付中" : phase === "closed" ? "締切" : "全問終了";
+    const phaseLabelMap = {
+        waiting: "待機中",
+        active: "回答受付中",
+        closed: "締切",
+        finished: "全問終了"
+    };
+    const phaseLabel = phaseLabelMap[phase] || "待機中";
+    const questionCount = gameState.totalQuestions || 1;
+    const currentQuestionNo = Math.min(gameState.currentQuestionIndex + 1, questionCount);
 
     return (
         <main className="page-shell min-h-screen p-3 md:p-6">
@@ -39,9 +46,7 @@ export default function GeoAdminView({
                     </div>
 
                     <h2 className="text-4xl font-extrabold text-[var(--main-color)]">運営コントロール</h2>
-                    <p className="mt-2 text-muted">
-                        問題 {Math.min(gameState.currentQuestionIndex + 1, gameState.totalQuestions || 1)} / {gameState.totalQuestions || 1}
-                    </p>
+                    <p className="mt-2 text-muted">問題 {currentQuestionNo} / {questionCount}</p>
                     <p className="mt-1 text-muted">状態: {phaseLabel}</p>
 
                     <div className="mt-5 space-y-2">

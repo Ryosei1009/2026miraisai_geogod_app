@@ -54,34 +54,21 @@ export default function GeoPlayerView({ phase, player, currentCategory, playerAn
         onPick({ lat, lng });
     };
 
+    const showMap = !isKeyMissing && !loadError && isLoaded;
+    const showMapLoading = !isKeyMissing && !loadError && !isLoaded;
+    const lastRound = player?.lastRound || {};
+
     return (
         <main className="page-shell min-h-screen">
             <div className="relative h-screen w-full">
-                {isKeyMissing && (
-                    <div className="flex h-full w-full items-center justify-center bg-card p-6 text-center">
-                        <div>
-                            <h3 className="text-2xl font-extrabold text-primary">Google Maps APIキーが未設定です</h3>
-                            <p className="mt-2 text-muted">.env に VITE_GOOGLE_MAPS_KEY を設定してください。</p>
-                        </div>
-                    </div>
-                )}
 
-                {!isKeyMissing && loadError && (
-                    <div className="flex h-full w-full items-center justify-center bg-card p-6 text-center">
-                        <div>
-                            <h3 className="text-2xl font-extrabold text-primary">地図の読み込みに失敗しました</h3>
-                            <p className="mt-2 text-muted">APIキーやドメイン設定をご確認ください。</p>
-                        </div>
-                    </div>
-                )}
-
-                {!isKeyMissing && !loadError && !isLoaded && (
+                {showMapLoading && (
                     <div className="flex h-full w-full items-center justify-center bg-card p-6 text-center">
                         <p className="text-muted">地図読み込み中...</p>
                     </div>
                 )}
 
-                {!isKeyMissing && !loadError && isLoaded && (
+                {showMap && (
                     <GoogleMap
                         center={JAPAN_CENTER}
                         zoom={JAPAN_ZOOM}
@@ -111,8 +98,8 @@ export default function GeoPlayerView({ phase, player, currentCategory, playerAn
                                     </div>
                                 </div>
                                 <div className="mt-2 grid gap-1 text-muted mt-3 grid-cols-2 text-sm">
-                                    <p>前問距離: {formatDistance(player?.lastRound?.distanceKm)}</p>
-                                    <p>前問得点: {player?.lastRound?.gained ?? 0}</p>
+                                    <p>前問距離: {formatDistance(lastRound.distanceKm)}</p>
+                                    <p>前問得点: {lastRound.gained ?? 0}</p>
                                 </div>
                             </div>
                         </div>
