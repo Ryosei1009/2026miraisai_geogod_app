@@ -715,7 +715,7 @@ export default function App() {
     return (
         <>
             {socketReady ? null : (
-                <div className="fixed top-0 left-0 right-0 bg-red-100 text-red-800 p-4 text-center">接続されていません。</div>
+                <div className="fixed w-full top-0 left-0 right-0 bg-red-100 text-red-800 p-4 text-center">接続されていません。</div>
             )}
             <PlayerView
                 mode={mode}
