@@ -125,25 +125,18 @@ export default function App() {
     const modeRef = useRef("geo");
     const prevGoodIndexRef = useRef(-1);
 
-    useEffect(() => {
-        joinedRef.current = joined;
-    }, [joined]);
-
+    // ref を同期させるシンプルな useEffect（最小限）
     useEffect(() => {
         isAdminRef.current = isAdmin;
-    }, [isAdmin]);
-
-    useEffect(() => {
         wantsAdminRef.current = wantsAdmin;
-    }, [wantsAdmin]);
+        joinedRef.current = joined;
+        modeRef.current = mode;
+    }, [isAdmin, wantsAdmin, joined, mode]);
 
     useEffect(() => {
         adminKeyRef.current = adminKey;
     }, [adminKey]);
 
-    useEffect(() => {
-        modeRef.current = mode;
-    }, [mode]);
 
     useEffect(() => {
         const savedName = getStored(STORAGE_KEYS.name);
