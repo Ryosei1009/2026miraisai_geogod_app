@@ -637,11 +637,6 @@ export default function App() {
                         socketReady={socketReady}
                     />
                 )}
-                <div className="fixed bottom-4 right-4 rounded-full bg-white/10 backdrop-blur px-3 py-1.5 text-xs font-semibold border border-white/20">
-                    <span className={socketReady ? "text-green-400" : "text-yellow-400"}>
-                        {socketReady ? "● 接続済み" : "● 接続中..."}
-                    </span>
-                </div>
             </>
         );
     }
@@ -713,11 +708,6 @@ export default function App() {
                     onConfirm={handleConfirm}
                     onCancel={handleCancel}
                 />
-                <div className="fixed bottom-4 right-4 rounded-full bg-white/10 backdrop-blur px-3 py-1.5 text-xs font-semibold border border-white/20">
-                    <span className={socketReady ? "text-green-400" : "text-yellow-400"}>
-                        {socketReady ? "● 接続済み" : "● 接続中..."}
-                    </span>
-                </div>
             </>
         );
     }
@@ -749,11 +739,6 @@ export default function App() {
                 formatDistance={formatDistance}
                 socketReady={socketReady}
             />
-            <div className="fixed bottom-4 right-4 rounded-full bg-white/10 backdrop-blur px-3 py-1.5 text-xs font-semibold border border-white/20">
-                <span className={socketReady ? "text-green-400" : "text-yellow-400"}>
-                    {socketReady ? "● 接続済み" : "● 接続中..."}
-                </span>
-            </div>
         </>
     );
 }
