@@ -117,9 +117,9 @@ export default function App() {
     const isAdminRef = useRef(false);
     const wantsAdminRef = useRef(false);
     const reconnectAttemptsRef = useRef(0);
-    const maxReconnectAttemptsRef = useRef(10);
     const reconnectTimeoutRef = useRef(null);
     const heartbeatIntervalRef = useRef(null);
+    const heartbeatTimeoutRef = useRef(null);
 
     useEffect(() => {
         joinedRef.current = joined;
@@ -211,6 +211,10 @@ export default function App() {
             clearInterval(heartbeatIntervalRef.current);
             heartbeatIntervalRef.current = null;
         }
+        if (heartbeatTimeoutRef.current) {
+            clearTimeout(heartbeatTimeoutRef.current);
+            heartbeatTimeoutRef.current = null;
+        }
     };
 
     const connectWebSocket = () => {
@@ -224,14 +228,38 @@ export default function App() {
             reconnectAttemptsRef.current = 0;
             setSocketReady(true);
 
-            // ハートビート送信の開始
+            // ハートビート送信の開始（30秒ごと）
             heartbeatIntervalRef.current = setInterval(() => {
-                send({ type: "ping" });
+                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                    send({ type: "ping" });
+                    
+                    // ハートビート応答タイムアウト設定（10秒以内にpongが来ないと再接続）
+                    heartbeatTimeoutRef.current = setTimeout(() => {
+                        console.warn("Heartbeat timeout - reconnecting...");
+                        clearHeartbeatInterval();
+                        setSocketReady(false);
+                        
+                        // ハートビート失敗時は即座に再接続
+                        reconnectAttemptsRef.current = 0;
+                        reconnectTimeoutRef.current = setTimeout(() => {
+                            connectWebSocket();
+                        }, 500);
+                    }, 10000);  // 10秒でタイムアウト
+                }
             }, 30000); // 30秒ごと
         };
 
         ws.onmessage = (event) => {
             const msg = JSON.parse(event.data);
+
+            // ハートビート応答を受け取ったらタイムアウトをクリア
+            if (msg.type === "pong") {
+                if (heartbeatTimeoutRef.current) {
+                    clearTimeout(heartbeatTimeoutRef.current);
+                    heartbeatTimeoutRef.current = null;
+                }
+                return;
+            }
 
             if (msg.type === "state") {
                 const payload = msg.payload || {};
@@ -325,19 +353,30 @@ export default function App() {
             clearHeartbeatInterval();
             setSocketReady(false);
 
-            // 自動再接続（指数バックオフ）
-            if (reconnectAttemptsRef.current < maxReconnectAttemptsRef.current) {
-                const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
-                reconnectAttemptsRef.current += 1;
-                reconnectTimeoutRef.current = setTimeout(() => {
-                    connectWebSocket();
-                }, delay);
-            }
+            // 自動再接続（初期遅延は短く、指数バックオフで段階的に増加）
+            const delay = reconnectAttemptsRef.current === 0 
+                ? 500  // 最初は500msで即座に再接続
+                : Math.min(500 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
+            
+            reconnectAttemptsRef.current += 1;
+            reconnectTimeoutRef.current = setTimeout(() => {
+                connectWebSocket();
+            }, delay);
         };
 
-        ws.onerror = () => {
+        ws.onerror = (error) => {
             clearHeartbeatInterval();
             setSocketReady(false);
+            
+            // エラーが発生した場合も即座に再接続を試みる
+            const delay = reconnectAttemptsRef.current === 0 
+                ? 500  // 最初は500msで即座に再接続
+                : Math.min(500 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
+            
+            reconnectAttemptsRef.current += 1;
+            reconnectTimeoutRef.current = setTimeout(() => {
+                connectWebSocket();
+            }, delay);
         };
 
         return () => {
