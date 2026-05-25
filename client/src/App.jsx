@@ -709,6 +709,10 @@ export default function App() {
         );
     }
 
+    useEffect(() => {
+        adminKeyRef.current = adminKey;
+    }, [adminKey]);
+
     return (
         <PlayerView
             mode={mode}
@@ -737,7 +741,3 @@ export default function App() {
         />
     );
 }
-
-    useEffect(() => {
-        adminKeyRef.current = adminKey;
-    }, [adminKey]);
