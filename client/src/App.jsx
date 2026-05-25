@@ -324,6 +324,10 @@ export default function App() {
                         window.localStorage.setItem(STORAGE_KEYS.goodState, JSON.stringify(goodState));
                         payload.hasVotedCurrent = false;
                         prevGoodIndexRef.current = payload.currentIndex;
+                    } else if (payload.mode === "good" && typeof payload.hasVotedCurrent === 'boolean') {
+                        // 同じ出演者の場合、hasVotedCurrent を保存
+                        const goodState = { hasVotedCurrent: payload.hasVotedCurrent };
+                        window.localStorage.setItem(STORAGE_KEYS.goodState, JSON.stringify(goodState));
                     }
                 }
                 
@@ -573,18 +577,17 @@ export default function App() {
         if (mode !== "good" || phase !== "live") {
             setGoodFlash(false);
         }
-    }, [mode, phase, currentIndex]);
+    }, [mode, phase]);
 
     useEffect(() => {
-        // good モード中に hasVotedCurrent を保存
+        // good モード中は状態を追跡し、geo モード中はクリア
         if (mode === "good") {
-            const goodState = { hasVotedCurrent: gameState.hasVotedCurrent };
-            window.localStorage.setItem(STORAGE_KEYS.goodState, JSON.stringify(goodState));
+            // 次の state 受信時に hasVotedCurrent が保存される
         } else {
             // geo モード中は good state をクリア
             window.localStorage.removeItem(STORAGE_KEYS.goodState);
         }
-    }, [mode, gameState.hasVotedCurrent]);
+    }, [mode]);
 
     useEffect(() => {
         if (goodFlash) {
