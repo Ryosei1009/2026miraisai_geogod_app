@@ -120,6 +120,7 @@ export default function App() {
     const reconnectTimeoutRef = useRef(null);
     const heartbeatIntervalRef = useRef(null);
     const heartbeatTimeoutRef = useRef(null);
+    const adminKeyRef = useRef("");
 
     useEffect(() => {
         joinedRef.current = joined;
@@ -227,6 +228,25 @@ export default function App() {
         ws.onopen = () => {
             reconnectAttemptsRef.current = 0;
             setSocketReady(true);
+
+            // 再接続時に join メッセージを再送
+            if (joinedRef.current) {
+                // 既に参加していた場合は再度 join を送信
+                const clientId = getStored(STORAGE_KEYS.clientId);
+                const savedName = getStored(STORAGE_KEYS.name);
+                
+                if (isAdminRef.current) {
+                    // 管理者の場合
+                    const adminKey = String(adminKeyRef?.current || "").trim();
+                    send({ type: "join", role: "admin", adminKey });
+                } else if (clientId && savedName) {
+                    // 参加者の場合
+                    send({ type: "join", role: "participant", name: savedName, clientId });
+                            } else {
+                                // 参加していなかった場合は自動再加入フラグをリセット
+                                autoJoinRef.current = false;
+                }
+            }
 
             // ハートビート送信の開始（30秒ごと）
             heartbeatIntervalRef.current = setInterval(() => {
@@ -717,3 +737,7 @@ export default function App() {
         />
     );
 }
+
+    useEffect(() => {
+        adminKeyRef.current = adminKey;
+    }, [adminKey]);

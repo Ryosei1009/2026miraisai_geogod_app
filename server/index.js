@@ -478,7 +478,9 @@ function handleAdminGoodMessage(msg) {
       const stat = performerStats[goodState.currentIndex];
       if (stat) {
         stat.locked = false;
-        // 投票に戻るときは参加者数と最大参加者数を再設定
+        // 投票に戻るときは投票状態をリセット
+        stat.voters.clear();
+        stat.goodCount = 0;
         const audienceCount = goodAudienceCount();
         stat.participantCount = audienceCount;
         stat.maxParticipantCount = Math.max(stat.maxParticipantCount, audienceCount);
@@ -493,7 +495,7 @@ function handleAdminGoodMessage(msg) {
     const stat = performerStats[goodState.currentIndex];
     if (stat) {
       stat.locked = false;
-      // 前の出演者に戻るときは参加者数と最大参加者数を再設定
+      // 前の出演者に戻るときはロック状態をリセット
       const audienceCount = goodAudienceCount();
       stat.participantCount = audienceCount;
       stat.maxParticipantCount = Math.max(stat.maxParticipantCount, audienceCount);
