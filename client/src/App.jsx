@@ -549,96 +549,102 @@ export default function App() {
 
     if (!joined) {
         return (
-            <main className="page-shell min-h-screen p-4 md:p-10">
-                <section className="glass-card mx-auto mt-10 max-w-xl p-8">
-                    <h1 className="mt-2 text-3xl font-extrabold text-primary">{mode === "good" ? "ゴッドタレント" : "ジオゲッサー"}</h1>
-                    <p className="">司会者の指示に従ってください。</p>
+            <>
+                <main className="page-shell min-h-screen p-4 md:p-10">
+                    <section className="glass-card mx-auto mt-10 max-w-xl p-8">
+                        <h1 className="mt-2 text-3xl font-extrabold text-primary">{mode === "good" ? "ゴッドタレント" : "ジオゲッサー"}</h1>
+                        <p className="">司会者の指示に従ってください。</p>
 
-                    {!wantsAdmin && mode === "geo" && (
-                        <div className="mt-7">
-                            <label className="block text-sm font-bold text-muted">ニックネーム</label>
-                            <input
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                maxLength={24}
-                                className="input-field mt-2 w-full rounded-xl border px-4 py-3 outline-none ring-0 transition"
-                            />
-                        </div>
-                    )}
-
-                    {!joined && showAdminPanel && (
-                        <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-4">
-                            <label className="block text-sm font-bold text-muted">管理者キー</label>
-                            <input
-                                value={adminKey}
-                                onChange={(e) => setAdminKey(e.target.value)}
-                                type="password"
-                                className="input-field mt-2 w-full rounded-xl border px-4 py-3 outline-none ring-0 transition"
-                            />
-                            <div className="mt-3 flex items-center justify-end gap-2">
-                                <button
-                                    onClick={() => setShowAdminPanel(false)}
-                                    className="rounded-lg border border-white/10 px-3 py-1 text-xs font-semibold text-muted"
-                                >
-                                    閉じる
-                                </button>
-                                <button
-                                    onClick={() => setWantsAdmin(true)}
-                                    className="rounded-lg bg-white/10 px-3 py-1 text-xs font-semibold"
-                                >
-                                    運営者として入る
-                                </button>
+                        {!wantsAdmin && mode === "geo" && (
+                            <div className="mt-7">
+                                <label className="block text-sm font-bold text-muted">ニックネーム</label>
+                                <input
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    maxLength={24}
+                                    className="input-field mt-2 w-full rounded-xl border px-4 py-3 outline-none ring-0 transition"
+                                />
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    <button
-                        onClick={joinAs}
-                        disabled={
-                            !socketReady ||
-                            (wantsAdmin ? !adminKey.trim() : mode === "geo" && !name.trim())
-                        }
-                        className="btn-main mt-8 w-full rounded-xl px-4 py-3 text-lg font-bold disabled:cursor-not-allowed"
-                    >
-                        {wantsAdmin ? "管理画面に入る" : "参加する"}
-                    </button>
+                        {!joined && showAdminPanel && (
+                            <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-4">
+                                <label className="block text-sm font-bold text-muted">管理者キー</label>
+                                <input
+                                    value={adminKey}
+                                    onChange={(e) => setAdminKey(e.target.value)}
+                                    type="password"
+                                    className="input-field mt-2 w-full rounded-xl border px-4 py-3 outline-none ring-0 transition"
+                                />
+                                <div className="mt-3 flex items-center justify-end gap-2">
+                                    <button
+                                        onClick={() => setShowAdminPanel(false)}
+                                        className="rounded-lg border border-white/10 px-3 py-1 text-xs font-semibold text-muted"
+                                    >
+                                        閉じる
+                                    </button>
+                                    <button
+                                        onClick={() => setWantsAdmin(true)}
+                                        className="rounded-lg bg-white/10 px-3 py-1 text-xs font-semibold"
+                                    >
+                                        運営者として入る
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
-                    <p className="mt-3 text-sm text-muted">接続状態: {socketReady ? "接続済み" : "接続中..."}</p>
-                </section>
-            </main>
+                        <button
+                            onClick={joinAs}
+                            disabled={
+                                !socketReady ||
+                                (wantsAdmin ? !adminKey.trim() : mode === "geo" && !name.trim())
+                            }
+                            className="btn-main mt-8 w-full rounded-xl px-4 py-3 text-lg font-bold disabled:cursor-not-allowed"
+                        >
+                            {wantsAdmin ? "管理画面に入る" : "参加する"}
+                        </button>
+                    </section>
+                </main>
+                <div className="fixed bottom-4 right-4 rounded-full bg-white/10 backdrop-blur px-3 py-1.5 text-xs font-semibold border border-white/20">
+                    <span className={socketReady ? "text-green-400" : "text-yellow-400"}>
+                        {socketReady ? "● 接続済み" : "● 接続中..."}
+                    </span>
+                </div>
+            </>
         );
     }
 
     if (isRankView) {
-        if (!isAdmin) {
-            return (
-                <main className="page-shell min-h-screen p-4 md:p-10">
-                    <section className="glass-card mx-auto mt-10 max-w-xl p-8">
-                        <h1 className="mt-2 text-2xl font-extrabold text-primary">ランキング</h1>
-                        <p className="mt-3 text-muted">このページは運営のみ閲覧できます。</p>
-                    </section>
-                </main>
-            );
-        }
-
-        if (mode !== "geo") {
-            return (
-                <main className="page-shell min-h-screen p-4 md:p-10">
-                    <section className="glass-card mx-auto mt-10 max-w-xl p-8">
-                        <h1 className="mt-2 text-2xl font-extrabold text-primary">ランキング</h1>
-                        <p className="mt-3 text-muted">ジオゲッサー企画でのみ表示されます。</p>
-                    </section>
-                </main>
-            );
-        }
-
         return (
-            <RankingView
-                ranking={gameState.ranking || []}
-                scoreMode={gameState.scoreMode || "separate"}
-                currentCategory={gameState.currentCategory || gameState.currentQuestion?.category || "trial"}
-                socketReady={socketReady}
-            />
+            <>
+                {!isAdmin ? (
+                    <main className="page-shell min-h-screen p-4 md:p-10">
+                        <section className="glass-card mx-auto mt-10 max-w-xl p-8">
+                            <h1 className="mt-2 text-2xl font-extrabold text-primary">ランキング</h1>
+                            <p className="mt-3 text-muted">このページは運営のみ閲覧できます。</p>
+                        </section>
+                    </main>
+                ) : mode !== "geo" ? (
+                    <main className="page-shell min-h-screen p-4 md:p-10">
+                        <section className="glass-card mx-auto mt-10 max-w-xl p-8">
+                            <h1 className="mt-2 text-2xl font-extrabold text-primary">ランキング</h1>
+                            <p className="mt-3 text-muted">ジオゲッサー企画でのみ表示されます。</p>
+                        </section>
+                    </main>
+                ) : (
+                    <RankingView
+                        ranking={gameState.ranking || []}
+                        scoreMode={gameState.scoreMode || "separate"}
+                        currentCategory={gameState.currentCategory || gameState.currentQuestion?.category || "trial"}
+                        socketReady={socketReady}
+                    />
+                )}
+                <div className="fixed bottom-4 right-4 rounded-full bg-white/10 backdrop-blur px-3 py-1.5 text-xs font-semibold border border-white/20">
+                    <span className={socketReady ? "text-green-400" : "text-yellow-400"}>
+                        {socketReady ? "● 接続済み" : "● 接続中..."}
+                    </span>
+                </div>
+            </>
         );
     }
 
@@ -709,35 +715,47 @@ export default function App() {
                     onConfirm={handleConfirm}
                     onCancel={handleCancel}
                 />
+                <div className="fixed bottom-4 right-4 rounded-full bg-white/10 backdrop-blur px-3 py-1.5 text-xs font-semibold border border-white/20">
+                    <span className={socketReady ? "text-green-400" : "text-yellow-400"}>
+                        {socketReady ? "● 接続済み" : "● 接続中..."}
+                    </span>
+                </div>
             </>
         );
     }
 
     return (
-        <PlayerView
-            mode={mode}
-            phase={phase}
-            player={player}
-            currentCategory={
-                gameState.currentCategory ||
-                gameState.currentQuestion?.category ||
-                categoryFromIndex(gameState.currentQuestionIndex)
-            }
-            playerAnswer={player?.currentAnswer || null}
-            pin={pin}
-            onPick={handlePick}
-            canAnswer={canAnswer}
-            revealedAnswer={revealedAnswer}
-            performers={performers}
-            currentIndex={currentIndex}
-            stats={stats}
-            audienceCount={gameState.audienceCount || 0}
-            hasVotedCurrent={gameState.hasVotedCurrent}
-            onGood={handleGood}
-            canGood={canGood}
-            error={error}
-            formatDistance={formatDistance}
-            socketReady={socketReady}
-        />
+        <>
+            <PlayerView
+                mode={mode}
+                phase={phase}
+                player={player}
+                currentCategory={
+                    gameState.currentCategory ||
+                    gameState.currentQuestion?.category ||
+                    categoryFromIndex(gameState.currentQuestionIndex)
+                }
+                playerAnswer={player?.currentAnswer || null}
+                pin={pin}
+                onPick={handlePick}
+                canAnswer={canAnswer}
+                revealedAnswer={revealedAnswer}
+                performers={performers}
+                currentIndex={currentIndex}
+                stats={stats}
+                audienceCount={gameState.audienceCount || 0}
+                hasVotedCurrent={gameState.hasVotedCurrent}
+                onGood={handleGood}
+                canGood={canGood}
+                error={error}
+                formatDistance={formatDistance}
+                socketReady={socketReady}
+            />
+            <div className="fixed bottom-4 right-4 rounded-full bg-white/10 backdrop-blur px-3 py-1.5 text-xs font-semibold border border-white/20">
+                <span className={socketReady ? "text-green-400" : "text-yellow-400"}>
+                    {socketReady ? "● 接続済み" : "● 接続中..."}
+                </span>
+            </div>
+        </>
     );
 }
