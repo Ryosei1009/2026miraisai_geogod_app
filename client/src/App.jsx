@@ -135,6 +135,10 @@ export default function App() {
     }, [wantsAdmin]);
 
     useEffect(() => {
+        adminKeyRef.current = adminKey;
+    }, [adminKey]);
+
+    useEffect(() => {
         const savedName = getStored(STORAGE_KEYS.name);
         if (savedName && !isAdmin) {
             setName(savedName);
@@ -708,10 +712,6 @@ export default function App() {
             </>
         );
     }
-
-    useEffect(() => {
-        adminKeyRef.current = adminKey;
-    }, [adminKey]);
 
     return (
         <PlayerView
