@@ -553,7 +553,7 @@ export default function App() {
     if (!joined) {
         return (
             <>
-                <main className={`page-shell min-h-screen p-4 md:p-10 ${socketReady ? "" : "border-2 border-red-500"}`}>
+                <main className={`page-shell min-h-screen p-4 md:p-10`}>
                     <section className="glass-card mx-auto mt-10 max-w-xl p-8">
                         <h1 className="mt-2 text-3xl font-extrabold text-primary">{mode === "good" ? "ゴッドタレント" : "ジオゲッサー"}</h1>
                         <p className="">司会者の指示に従ってください。</p>
@@ -714,31 +714,33 @@ export default function App() {
 
     return (
         <>
-            <PlayerView
-                mode={mode}
-                phase={phase}
-                player={player}
-                currentCategory={
-                    gameState.currentCategory ||
-                    gameState.currentQuestion?.category ||
-                    categoryFromIndex(gameState.currentQuestionIndex)
-                }
-                playerAnswer={player?.currentAnswer || null}
-                pin={pin}
-                onPick={handlePick}
-                canAnswer={canAnswer}
-                revealedAnswer={revealedAnswer}
-                performers={performers}
-                currentIndex={currentIndex}
-                stats={stats}
-                audienceCount={gameState.audienceCount || 0}
-                hasVotedCurrent={gameState.hasVotedCurrent}
-                onGood={handleGood}
-                canGood={canGood}
-                error={error}
-                formatDistance={formatDistance}
-                socketReady={socketReady}
-            />
+            <main className={socketReady ? "" : "border-2 border-red-500"}>
+                <PlayerView
+                    mode={mode}
+                    phase={phase}
+                    player={player}
+                    currentCategory={
+                        gameState.currentCategory ||
+                        gameState.currentQuestion?.category ||
+                        categoryFromIndex(gameState.currentQuestionIndex)
+                    }
+                    playerAnswer={player?.currentAnswer || null}
+                    pin={pin}
+                    onPick={handlePick}
+                    canAnswer={canAnswer}
+                    revealedAnswer={revealedAnswer}
+                    performers={performers}
+                    currentIndex={currentIndex}
+                    stats={stats}
+                    audienceCount={gameState.audienceCount || 0}
+                    hasVotedCurrent={gameState.hasVotedCurrent}
+                    onGood={handleGood}
+                    canGood={canGood}
+                    error={error}
+                    formatDistance={formatDistance}
+                    socketReady={socketReady}
+                />
+            </main>
         </>
     );
 }
