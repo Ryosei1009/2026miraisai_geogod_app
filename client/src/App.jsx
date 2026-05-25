@@ -7,7 +7,8 @@ import RankingView from "./components/RankingView";
 const STORAGE_KEYS = {
     clientId: "geoguessr.clientId",
     name: "geoguessr.name",
-    gameId: "geoguessr.gameId"
+    gameId: "geoguessr.gameId",
+    goodState: "geoguessr.goodState"
 };
 
 const getStored = (key) => window.localStorage.getItem(key) || "";
@@ -121,6 +122,7 @@ export default function App() {
     const heartbeatIntervalRef = useRef(null);
     const heartbeatTimeoutRef = useRef(null);
     const adminKeyRef = useRef("");
+    const modeRef = useRef("geo");
 
     useEffect(() => {
         joinedRef.current = joined;
@@ -137,6 +139,10 @@ export default function App() {
     useEffect(() => {
         adminKeyRef.current = adminKey;
     }, [adminKey]);
+
+    useEffect(() => {
+        modeRef.current = mode;
+    }, [mode]);
 
     useEffect(() => {
         const savedName = getStored(STORAGE_KEYS.name);
@@ -238,19 +244,27 @@ export default function App() {
                 // 既に参加していた場合は再度 join を送信
                 const clientId = getStored(STORAGE_KEYS.clientId);
                 const savedName = getStored(STORAGE_KEYS.name);
+                const currentMode = modeRef.current;
                 
                 if (isAdminRef.current) {
                     // 管理者の場合
                     const adminKey = String(adminKeyRef?.current || "").trim();
                     send({ type: "join", role: "admin", adminKey });
+                } else if (currentMode === "good") {
+                    // ゴッドタレント視聴者として再参加
+                    const audienceClientId = clientId || getOrCreateClientId();
+                    send({ type: "join", role: "audience", clientId: audienceClientId });
                 } else if (clientId && savedName) {
-                    // 参加者の場合
+                    // 参加者の場合（ジオゲッサー）
                     send({ type: "join", role: "participant", name: savedName, clientId });
-                            } else {
-                                // 参加していなかった場合は自動再加入フラグをリセット
-                                autoJoinRef.current = false;
+                } else {
+                    // 参加していなかった場合は自動再加入フラグをリセット
+                    autoJoinRef.current = false;
                 }
             }
+
+            // 再接続後は状態リクエストを送信
+            send({ type: "state:request" });
 
             // ハートビート送信の開始（30秒ごと）
             heartbeatIntervalRef.current = setInterval(() => {
@@ -287,7 +301,31 @@ export default function App() {
 
             if (msg.type === "state") {
                 const payload = msg.payload || {};
+                
+                // good モード中の場合、hasVotedCurrent を保存された値で復元
+                if (modeRef.current === "good") {
+                    const savedGoodState = window.localStorage.getItem(STORAGE_KEYS.goodState);
+                    if (savedGoodState) {
+                        try {
+                            const { hasVotedCurrent } = JSON.parse(savedGoodState);
+                            payload.hasVotedCurrent = hasVotedCurrent;
+                        } catch (e) {
+                            // パース失敗時はスキップ
+                        }
+                    }
+                }
+                
                 setGameState(payload);
+
+                // good モード中に currentIndex が変わった場合は hasVotedCurrent をリセット
+                if (payload.mode === "good" && payload.currentIndex !== undefined) {
+                    const prevIndex = gameState.currentIndex;
+                    if (prevIndex !== payload.currentIndex) {
+                        // 出演者が変わったので hasVotedCurrent をリセット
+                        const goodState = { hasVotedCurrent: false };
+                        window.localStorage.setItem(STORAGE_KEYS.goodState, JSON.stringify(goodState));
+                    }
+                }
 
                 if (pendingAdminRef.current) {
                     if (payload.selfRole === "admin") {
@@ -534,6 +572,17 @@ export default function App() {
             setGoodFlash(false);
         }
     }, [mode, phase, currentIndex]);
+
+    useEffect(() => {
+        // good モード中に hasVotedCurrent を保存
+        if (mode === "good") {
+            const goodState = { hasVotedCurrent: gameState.hasVotedCurrent };
+            window.localStorage.setItem(STORAGE_KEYS.goodState, JSON.stringify(goodState));
+        } else {
+            // geo モード中は good state をクリア
+            window.localStorage.removeItem(STORAGE_KEYS.goodState);
+        }
+    }, [mode, gameState.hasVotedCurrent]);
 
     useEffect(() => {
         if (goodFlash) {
