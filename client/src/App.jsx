@@ -123,6 +123,7 @@ export default function App() {
     const heartbeatTimeoutRef = useRef(null);
     const adminKeyRef = useRef("");
     const modeRef = useRef("geo");
+    const prevGoodIndexRef = useRef(-1);
 
     useEffect(() => {
         joinedRef.current = joined;
@@ -315,17 +316,18 @@ export default function App() {
                     }
                 }
                 
-                setGameState(payload);
-
                 // good モード中に currentIndex が変わった場合は hasVotedCurrent をリセット
                 if (payload.mode === "good" && payload.currentIndex !== undefined) {
-                    const prevIndex = gameState.currentIndex;
-                    if (prevIndex !== payload.currentIndex) {
+                    if (prevGoodIndexRef.current !== payload.currentIndex) {
                         // 出演者が変わったので hasVotedCurrent をリセット
                         const goodState = { hasVotedCurrent: false };
                         window.localStorage.setItem(STORAGE_KEYS.goodState, JSON.stringify(goodState));
+                        payload.hasVotedCurrent = false;
+                        prevGoodIndexRef.current = payload.currentIndex;
                     }
                 }
+                
+                setGameState(payload);
 
                 if (pendingAdminRef.current) {
                     if (payload.selfRole === "admin") {
