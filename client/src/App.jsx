@@ -553,7 +553,7 @@ export default function App() {
     if (!joined) {
         return (
             <>
-                <main className="page-shell min-h-screen p-4 md:p-10">
+                <main className={`page-shell min-h-screen p-4 md:p-10 ${socketReady ? "" : "border-2 border-red-500"}`}>
                     <section className="glass-card mx-auto mt-10 max-w-xl p-8">
                         <h1 className="mt-2 text-3xl font-extrabold text-primary">{mode === "good" ? "ゴッドタレント" : "ジオゲッサー"}</h1>
                         <p className="">司会者の指示に従ってください。</p>
@@ -608,11 +608,6 @@ export default function App() {
                         </button>
                     </section>
                 </main>
-                <div className="fixed bottom-4 right-4 rounded-full bg-white/10 backdrop-blur px-3 py-1.5 text-xs font-semibold border border-white/20">
-                    <span className={socketReady ? "text-green-400" : "text-yellow-400"}>
-                        {socketReady ? "● 接続済み" : "● 接続中..."}
-                    </span>
-                </div>
             </>
         );
     }
