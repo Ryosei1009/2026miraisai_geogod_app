@@ -116,6 +116,10 @@ export default function App() {
     const pendingAdminRef = useRef(false);
     const isAdminRef = useRef(false);
     const wantsAdminRef = useRef(false);
+    const reconnectAttemptsRef = useRef(0);
+    const maxReconnectAttemptsRef = useRef(10);
+    const reconnectTimeoutRef = useRef(null);
+    const heartbeatIntervalRef = useRef(null);
 
     useEffect(() => {
         joinedRef.current = joined;
@@ -154,6 +158,40 @@ export default function App() {
             setShowAdminPanel(true);
             setWantsAdmin(true);
         }
+
+        // WebSocket接続開始
+        connectWebSocket();
+
+        // バックグラウンド/フォアグラウンド遷移の検出
+        const handleVisibilityChange = () => {
+            if (!document.hidden && (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN)) {
+                // フォアグラウンドに戻ってきて、WebSocketが接続されていない場合は再接続
+                reconnectAttemptsRef.current = 0;
+                connectWebSocket();
+            }
+        };
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+
+        // オンライン/オフライン遷移の検出
+        const handleOnline = () => {
+            if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+                reconnectAttemptsRef.current = 0;
+                connectWebSocket();
+            }
+        };
+
+        window.addEventListener("online", handleOnline);
+
+        return () => {
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+            window.removeEventListener("online", handleOnline);
+            clearReconnectTimeout();
+            clearHeartbeatInterval();
+            if (wsRef.current) {
+                wsRef.current.close();
+            }
+        };
     }, []);
 
     const send = (payload) => {
@@ -161,11 +199,36 @@ export default function App() {
         wsRef.current.send(JSON.stringify(payload));
     };
 
-    useEffect(() => {
+    const clearReconnectTimeout = () => {
+        if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+            reconnectTimeoutRef.current = null;
+        }
+    };
+
+    const clearHeartbeatInterval = () => {
+        if (heartbeatIntervalRef.current) {
+            clearInterval(heartbeatIntervalRef.current);
+            heartbeatIntervalRef.current = null;
+        }
+    };
+
+    const connectWebSocket = () => {
+        clearReconnectTimeout();
+        clearHeartbeatInterval();
+
         const ws = new WebSocket(wsUrlFromWindow());
         wsRef.current = ws;
 
-        ws.onopen = () => setSocketReady(true);
+        ws.onopen = () => {
+            reconnectAttemptsRef.current = 0;
+            setSocketReady(true);
+
+            // ハートビート送信の開始
+            heartbeatIntervalRef.current = setInterval(() => {
+                send({ type: "ping" });
+            }, 30000); // 30秒ごと
+        };
 
         ws.onmessage = (event) => {
             const msg = JSON.parse(event.data);
@@ -258,16 +321,39 @@ export default function App() {
             }
         };
 
-        ws.onclose = () => setSocketReady(false);
+        ws.onclose = () => {
+            clearHeartbeatInterval();
+            setSocketReady(false);
 
-        return () => ws.close();
-    }, []);
+            // 自動再接続（指数バックオフ）
+            if (reconnectAttemptsRef.current < maxReconnectAttemptsRef.current) {
+                const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
+                reconnectAttemptsRef.current += 1;
+                reconnectTimeoutRef.current = setTimeout(() => {
+                    connectWebSocket();
+                }, delay);
+            }
+        };
+
+        ws.onerror = () => {
+            clearHeartbeatInterval();
+            setSocketReady(false);
+        };
+
+        return () => {
+            clearReconnectTimeout();
+            clearHeartbeatInterval();
+            ws.close();
+        };
+    };
 
     useEffect(() => {
         if (!socketReady) return;
         const timer = window.setInterval(() => {
-            send({ type: "state:request" });
-        }, 1500);
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                send({ type: "state:request" });
+            }
+        }, 3000);
 
         return () => window.clearInterval(timer);
     }, [socketReady]);

@@ -73,6 +73,7 @@ const performerStats = performers.map((performer) => ({
   id: performer.id,
   goodCount: 0,
   participantCount: 0,
+  maxParticipantCount: 0,
   locked: false,
   voters: new Set()
 }));
@@ -192,6 +193,7 @@ function resetStats() {
   for (const stat of performerStats) {
     stat.goodCount = 0;
     stat.participantCount = 0;
+    stat.maxParticipantCount = 0;
     stat.locked = false;
     stat.voters.clear();
   }
@@ -216,7 +218,11 @@ function buildStatsSummary() {
   return performerStats.map((stat, index) => {
     const isCurrent = goodState.phase === "live" && index === goodState.currentIndex;
     const goodCount = isCurrent && !stat.locked ? stat.voters.size : stat.goodCount;
-    const participantCount = isCurrent && !stat.locked ? liveAudience : stat.participantCount;
+    let participantCount = isCurrent && !stat.locked ? liveAudience : stat.participantCount;
+    // 投票中は最大接続者数を更新
+    if (isCurrent && !stat.locked) {
+      stat.maxParticipantCount = Math.max(stat.maxParticipantCount, liveAudience);
+    }
     return {
       id: stat.id,
       no: performers[index]?.no || "",
@@ -401,6 +407,10 @@ function handleAdminJumpMessage(msg) {
       const stat = performerStats[clamped];
       if (stat) {
         stat.locked = false;
+        // ジャンプした出演者の投票開始時に参加者数と最大参加者数を初期化
+        const audienceCount = goodAudienceCount();
+        stat.participantCount = audienceCount;
+        stat.maxParticipantCount = audienceCount;
       }
       broadcastState();
     }
@@ -421,6 +431,12 @@ function handleAdminGoodMessage(msg) {
     resetStats();
     goodState.phase = "live";
     goodState.currentIndex = performers.length > 0 ? 0 : -1;
+    // 投票開始時に参加者数と最大参加者数を初期化
+    if (goodState.currentIndex >= 0 && goodState.currentIndex < performerStats.length) {
+      const audienceCount = goodAudienceCount();
+      performerStats[goodState.currentIndex].participantCount = audienceCount;
+      performerStats[goodState.currentIndex].maxParticipantCount = audienceCount;
+    }
     broadcastState();
     return true;
   }
@@ -444,6 +460,10 @@ function handleAdminGoodMessage(msg) {
         const stat = performerStats[goodState.currentIndex];
         if (stat) {
           stat.locked = false;
+          // 新しい出演者の投票開始時に参加者数と最大参加者数を初期化
+          const audienceCount = goodAudienceCount();
+          stat.participantCount = audienceCount;
+          stat.maxParticipantCount = audienceCount;
         }
       }
       broadcastState();
@@ -456,7 +476,13 @@ function handleAdminGoodMessage(msg) {
     if (goodState.phase === "review") {
       goodState.phase = "live";
       const stat = performerStats[goodState.currentIndex];
-      if (stat) stat.locked = false;
+      if (stat) {
+        stat.locked = false;
+        // 投票に戻るときは参加者数と最大参加者数を再設定
+        const audienceCount = goodAudienceCount();
+        stat.participantCount = audienceCount;
+        stat.maxParticipantCount = Math.max(stat.maxParticipantCount, audienceCount);
+      }
       broadcastState();
       return true;
     }
@@ -465,7 +491,13 @@ function handleAdminGoodMessage(msg) {
     if (goodState.currentIndex <= 0) return true;
     goodState.currentIndex -= 1;
     const stat = performerStats[goodState.currentIndex];
-    if (stat) stat.locked = false;
+    if (stat) {
+      stat.locked = false;
+      // 前の出演者に戻るときは参加者数と最大参加者数を再設定
+      const audienceCount = goodAudienceCount();
+      stat.participantCount = audienceCount;
+      stat.maxParticipantCount = Math.max(stat.maxParticipantCount, audienceCount);
+    }
     broadcastState();
     return true;
   }
@@ -583,7 +615,8 @@ function lockCurrentStats() {
   const stat = performerStats[goodState.currentIndex];
   if (!stat) return;
   stat.goodCount = stat.voters.size;
-  stat.participantCount = goodAudienceCount();
+  // 投票期間中の最大接続者数を参加者数として固定
+  stat.participantCount = stat.maxParticipantCount;
   stat.locked = true;
 }
 
@@ -625,6 +658,11 @@ wss.on("connection", (ws) => {
 
       if (msg.type === "state:request") {
         send(ws, { type: "state", payload: buildStateFor(meta) });
+        return;
+      }
+
+      if (msg.type === "ping") {
+        send(ws, { type: "pong" });
         return;
       }
 
