@@ -312,14 +312,34 @@ function handleJoinMessage(ws, meta, msg) {
     participant.name = name;
     participant.clientId = clientId || participant.clientId;
 
+    // 同じclientIdでの古い接続があれば削除
+    if (participant.clientId) {
+      for (const [oldWs, oldMeta] of clients.entries()) {
+        if (oldWs !== ws && oldMeta.clientId === participant.clientId && oldMeta.role === "participant") {
+          oldWs.close();
+          clients.delete(oldWs);
+        }
+      }
+    }
+
     clients.set(ws, participant);
     if (participant.clientId) {
       participantsById.set(participant.clientId, participant);
     }
   } else {
     const clientId = String(msg.clientId || "").trim() || `guest_${Math.random().toString(36).slice(2, 10)}`;
+    
+    // 同じclientIdでの古い接続があれば削除
+    for (const [oldWs, oldMeta] of clients.entries()) {
+      if (oldWs !== ws && oldMeta.clientId === clientId && oldMeta.role === "audience") {
+        oldWs.close();
+        clients.delete(oldWs);
+      }
+    }
+    
     meta.role = "audience";
     meta.clientId = clientId;
+    clients.set(ws, meta);
   }
 
   broadcastState();

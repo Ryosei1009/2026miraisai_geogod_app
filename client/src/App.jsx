@@ -7,8 +7,7 @@ import RankingView from "./components/RankingView";
 const STORAGE_KEYS = {
     clientId: "geoguessr.clientId",
     name: "geoguessr.name",
-    gameId: "geoguessr.gameId",
-    goodState: "geoguessr.goodState"
+    gameId: "geoguessr.gameId"
 };
 
 const getStored = (key) => window.localStorage.getItem(key) || "";
@@ -122,21 +121,22 @@ export default function App() {
     const heartbeatIntervalRef = useRef(null);
     const heartbeatTimeoutRef = useRef(null);
     const adminKeyRef = useRef("");
-    const modeRef = useRef("geo");
-    const prevGoodIndexRef = useRef(-1);
 
-    // ref を同期させるシンプルな useEffect（最小限）
+    useEffect(() => {
+        joinedRef.current = joined;
+    }, [joined]);
+
     useEffect(() => {
         isAdminRef.current = isAdmin;
+    }, [isAdmin]);
+
+    useEffect(() => {
         wantsAdminRef.current = wantsAdmin;
-        joinedRef.current = joined;
-        modeRef.current = mode;
-    }, [isAdmin, wantsAdmin, joined, mode]);
+    }, [wantsAdmin]);
 
     useEffect(() => {
         adminKeyRef.current = adminKey;
     }, [adminKey]);
-
 
     useEffect(() => {
         const savedName = getStored(STORAGE_KEYS.name);
@@ -238,27 +238,22 @@ export default function App() {
                 // 既に参加していた場合は再度 join を送信
                 const clientId = getStored(STORAGE_KEYS.clientId);
                 const savedName = getStored(STORAGE_KEYS.name);
-                const currentMode = modeRef.current;
                 
                 if (isAdminRef.current) {
                     // 管理者の場合
                     const adminKey = String(adminKeyRef?.current || "").trim();
                     send({ type: "join", role: "admin", adminKey });
-                } else if (currentMode === "good") {
-                    // ゴッドタレント視聴者として再参加
-                    const audienceClientId = clientId || getOrCreateClientId();
-                    send({ type: "join", role: "audience", clientId: audienceClientId });
                 } else if (clientId && savedName) {
-                    // 参加者の場合（ジオゲッサー）
+                    // 参加者（geo）の場合
                     send({ type: "join", role: "participant", name: savedName, clientId });
+                } else if (clientId) {
+                    // オーディエンス（good）の場合
+                    send({ type: "join", role: "audience", clientId });
                 } else {
                     // 参加していなかった場合は自動再加入フラグをリセット
                     autoJoinRef.current = false;
                 }
             }
-
-            // 再接続後は状態リクエストを送信
-            send({ type: "state:request" });
 
             // ハートビート送信の開始（30秒ごと）
             heartbeatIntervalRef.current = setInterval(() => {
@@ -295,35 +290,6 @@ export default function App() {
 
             if (msg.type === "state") {
                 const payload = msg.payload || {};
-                
-                // good モード中の場合、hasVotedCurrent を保存された値で復元
-                if (modeRef.current === "good") {
-                    const savedGoodState = window.localStorage.getItem(STORAGE_KEYS.goodState);
-                    if (savedGoodState) {
-                        try {
-                            const { hasVotedCurrent } = JSON.parse(savedGoodState);
-                            payload.hasVotedCurrent = hasVotedCurrent;
-                        } catch (e) {
-                            // パース失敗時はスキップ
-                        }
-                    }
-                }
-                
-                // good モード中に currentIndex が変わった場合は hasVotedCurrent をリセット
-                if (payload.mode === "good" && payload.currentIndex !== undefined) {
-                    if (prevGoodIndexRef.current !== payload.currentIndex) {
-                        // 出演者が変わったので hasVotedCurrent をリセット
-                        const goodState = { hasVotedCurrent: false };
-                        window.localStorage.setItem(STORAGE_KEYS.goodState, JSON.stringify(goodState));
-                        payload.hasVotedCurrent = false;
-                        prevGoodIndexRef.current = payload.currentIndex;
-                    } else if (payload.mode === "good" && typeof payload.hasVotedCurrent === 'boolean') {
-                        // 同じ出演者の場合、hasVotedCurrent を保存
-                        const goodState = { hasVotedCurrent: payload.hasVotedCurrent };
-                        window.localStorage.setItem(STORAGE_KEYS.goodState, JSON.stringify(goodState));
-                    }
-                }
-                
                 setGameState(payload);
 
                 if (pendingAdminRef.current) {
@@ -570,17 +536,7 @@ export default function App() {
         if (mode !== "good" || phase !== "live") {
             setGoodFlash(false);
         }
-    }, [mode, phase]);
-
-    useEffect(() => {
-        // good モード中は状態を追跡し、geo モード中はクリア
-        if (mode === "good") {
-            // 次の state 受信時に hasVotedCurrent が保存される
-        } else {
-            // geo モード中は good state をクリア
-            window.localStorage.removeItem(STORAGE_KEYS.goodState);
-        }
-    }, [mode]);
+    }, [mode, phase, currentIndex]);
 
     useEffect(() => {
         if (goodFlash) {
