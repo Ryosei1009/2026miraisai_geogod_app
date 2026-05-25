@@ -553,6 +553,9 @@ export default function App() {
     if (!joined) {
         return (
             <>
+                {socketReady ? null : (
+                    <div className="fixed w-full top-0 left-0 right-0 bg-amber-100 text-amber-800 p-4 text-center font-semibold z-50">接続されていません。</div>
+                )}
                 <main className={`page-shell min-h-screen p-4 md:p-10`}>
                     <section className="glass-card mx-auto mt-10 max-w-xl p-8">
                         <h1 className="mt-2 text-3xl font-extrabold text-primary">{mode === "good" ? "ゴッドタレント" : "ジオゲッサー"}</h1>
@@ -615,6 +618,9 @@ export default function App() {
     if (isRankView) {
         return (
             <>
+                {socketReady ? null : (
+                    <div className="fixed w-full top-0 left-0 right-0 bg-amber-100 text-amber-800 p-4 text-center font-semibold z-50">接続されていません。</div>
+                )}
                 {!isAdmin ? (
                     <main className="page-shell min-h-screen p-4 md:p-10">
                         <section className="glass-card mx-auto mt-10 max-w-xl p-8">
@@ -644,6 +650,9 @@ export default function App() {
     if (isAdmin) {
         return (
             <>
+                {socketReady ? null : (
+                    <div className="fixed w-full top-0 left-0 right-0 bg-amber-100 text-amber-800 p-4 text-center font-semibold z-50">接続されていません。</div>
+                )}
                 <AdminView
                     mode={mode}
                     onSwitchMode={(nextMode) =>
@@ -715,7 +724,7 @@ export default function App() {
     return (
         <>
             {socketReady ? null : (
-                <div className="fixed w-full top-0 left-0 right-0 bg-red-100 text-red-800 p-4 text-center">接続されていません。</div>
+                <div className="fixed w-full top-0 left-0 right-0 bg-amber-100 text-amber-800 p-4 text-center font-semibold z-50">接続されていません。</div>
             )}
             <PlayerView
                 mode={mode}
