@@ -238,7 +238,7 @@ export default function App() {
                 // 既に参加していた場合は再度 join を送信
                 const clientId = getStored(STORAGE_KEYS.clientId);
                 const savedName = getStored(STORAGE_KEYS.name);
-                
+
                 if (isAdminRef.current) {
                     // 管理者の場合
                     const adminKey = String(adminKeyRef?.current || "").trim();
@@ -259,13 +259,13 @@ export default function App() {
             heartbeatIntervalRef.current = setInterval(() => {
                 if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                     send({ type: "ping" });
-                    
+
                     // ハートビート応答タイムアウト設定（10秒以内にpongが来ないと再接続）
                     heartbeatTimeoutRef.current = setTimeout(() => {
                         console.warn("Heartbeat timeout - reconnecting...");
                         clearHeartbeatInterval();
                         setSocketReady(false);
-                        
+
                         // ハートビート失敗時は即座に再接続
                         reconnectAttemptsRef.current = 0;
                         reconnectTimeoutRef.current = setTimeout(() => {
@@ -381,10 +381,10 @@ export default function App() {
             setSocketReady(false);
 
             // 自動再接続（初期遅延は短く、指数バックオフで段階的に増加）
-            const delay = reconnectAttemptsRef.current === 0 
+            const delay = reconnectAttemptsRef.current === 0
                 ? 500  // 最初は500msで即座に再接続
                 : Math.min(500 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
-            
+
             reconnectAttemptsRef.current += 1;
             reconnectTimeoutRef.current = setTimeout(() => {
                 connectWebSocket();
@@ -394,12 +394,12 @@ export default function App() {
         ws.onerror = (error) => {
             clearHeartbeatInterval();
             setSocketReady(false);
-            
+
             // エラーが発生した場合も即座に再接続を試みる
-            const delay = reconnectAttemptsRef.current === 0 
+            const delay = reconnectAttemptsRef.current === 0
                 ? 500  // 最初は500msで即座に再接続
                 : Math.min(500 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
-            
+
             reconnectAttemptsRef.current += 1;
             reconnectTimeoutRef.current = setTimeout(() => {
                 connectWebSocket();
@@ -714,33 +714,34 @@ export default function App() {
 
     return (
         <>
-            <main className={socketReady ? "" : "border-2 border-red-500"}>
-                <PlayerView
-                    mode={mode}
-                    phase={phase}
-                    player={player}
-                    currentCategory={
-                        gameState.currentCategory ||
-                        gameState.currentQuestion?.category ||
-                        categoryFromIndex(gameState.currentQuestionIndex)
-                    }
-                    playerAnswer={player?.currentAnswer || null}
-                    pin={pin}
-                    onPick={handlePick}
-                    canAnswer={canAnswer}
-                    revealedAnswer={revealedAnswer}
-                    performers={performers}
-                    currentIndex={currentIndex}
-                    stats={stats}
-                    audienceCount={gameState.audienceCount || 0}
-                    hasVotedCurrent={gameState.hasVotedCurrent}
-                    onGood={handleGood}
-                    canGood={canGood}
-                    error={error}
-                    formatDistance={formatDistance}
-                    socketReady={socketReady}
-                />
-            </main>
+            {socketReady ? null : (
+                <div className="bg-red-100 text-red-800 p-4 text-center">接続されていません。</div>
+            )}
+            <PlayerView
+                mode={mode}
+                phase={phase}
+                player={player}
+                currentCategory={
+                    gameState.currentCategory ||
+                    gameState.currentQuestion?.category ||
+                    categoryFromIndex(gameState.currentQuestionIndex)
+                }
+                playerAnswer={player?.currentAnswer || null}
+                pin={pin}
+                onPick={handlePick}
+                canAnswer={canAnswer}
+                revealedAnswer={revealedAnswer}
+                performers={performers}
+                currentIndex={currentIndex}
+                stats={stats}
+                audienceCount={gameState.audienceCount || 0}
+                hasVotedCurrent={gameState.hasVotedCurrent}
+                onGood={handleGood}
+                canGood={canGood}
+                error={error}
+                formatDistance={formatDistance}
+                socketReady={socketReady}
+            />
         </>
     );
 }
