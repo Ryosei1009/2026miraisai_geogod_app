@@ -33,10 +33,10 @@ function createGameId() {
 let gameId = createGameId();
 
 const questions = [
-  { id: 1, title: "お試し: 東京駅", answer: { lat: 35.681236, lng: 139.767125 }, category: "trial" },
-  { id: 2, title: "日本1: 姫路城", answer: { lat: 34.839449, lng: 134.693904 }, category: "japan" },
-  { id: 3, title: "日本2: 阿蘇山", answer: { lat: 32.8847, lng: 131.1043 }, category: "japan" },
-  { id: 4, title: "日本3: 金閣寺", answer: { lat: 35.03937, lng: 135.72924 }, category: "japan" },
+  { id: 1, title: "お試し: 東京駅", answer: { lat: 35.4042246, lng: 139.464839 }, category: "trial" },
+  { id: 2, title: "日本1: 姫路城", answer: { lat: 34.50461, lng: 134.4143005 }, category: "japan" },
+  { id: 3, title: "日本2: 金閣寺", answer: { lat: 35.28613, lng: 135.4353434 }, category: "japan" },
+  { id: 4, title: "日本3: 阿蘇山", answer: { lat: 32.8847, lng: 131.1043 }, category: "japan" },
   { id: 5, title: "日本4: 弘前城", answer: { lat: 40.60707, lng: 140.46412 }, category: "japan" },
   { id: 6, title: "日本5: 松山城", answer: { lat: 33.84584, lng: 132.7654 }, category: "japan" },
   { id: 7, title: "世界1: エッフェル塔", answer: { lat: 48.85837, lng: 2.29448 }, category: "world" },
