@@ -7,11 +7,58 @@ import { createServer as createHttpsServer } from "https";
 import path from "path";
 import { fileURLToPath } from "url";
 import { WebSocketServer } from "ws";
+import winston from "winston";
+import "winston-daily-rotate-file";
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// ログディレクトリの作成
+const logsDir = path.join(__dirname, "logs");
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
+
+// Winstonロガーのセットアップ
+const logger = winston.createLogger({
+  level: "info",
+  format: winston.format.combine(
+    winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
+    winston.format.errors({ stack: true }),
+    winston.format.printf(({ timestamp, level, message, stack }) => {
+      return stack
+        ? `[${timestamp}] ${level.toUpperCase()}: ${message}\n${stack}`
+        : `[${timestamp}] ${level.toUpperCase()}: ${message}`;
+    })
+  ),
+  transports: [
+    // コンソール出力（本番環境では情報レベルのみ）
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      )
+    }),
+    // 日単位でローテーションするファイル（すべてのログ）
+    new (await import("winston-daily-rotate-file")).default({
+      filename: path.join(logsDir, "server-%DATE%.log"),
+      datePattern: "YYYY-MM-DD",
+      maxSize: "20m",
+      maxDays: "30d",
+      level: "debug"
+    }),
+    // エラーログのみを別ファイルに保存
+    new (await import("winston-daily-rotate-file")).default({
+      filename: path.join(logsDir, "error-%DATE%.log"),
+      datePattern: "YYYY-MM-DD",
+      maxSize: "20m",
+      maxDays: "30d",
+      level: "error"
+    })
+  ]
+});
 
 const app = express();
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "";
@@ -33,9 +80,9 @@ function createGameId() {
 let gameId = createGameId();
 
 const questions = [
-  { id: 1, title: "お試し: 東京駅", answer: { lat: 35.4042246, lng: 139.464839 }, category: "trial" },
-  { id: 2, title: "日本1: 姫路城", answer: { lat: 34.50461, lng: 134.4143005 }, category: "japan" },
-  { id: 3, title: "日本2: 金閣寺", answer: { lat: 35.28613, lng: 135.4353434 }, category: "japan" },
+  { id: 1, title: "お試し: 東京駅", answer: { lat: 35.681659075025316, lng: 139.76476867091722 }, category: "trial" },
+  { id: 2, title: "日本1: 姫路城", answer: { lat: 34.83784159253512, lng: 134.69253631521838 }, category: "japan" },
+  { id: 3, title: "日本2: 金閣寺", answer: { lat: 35.038931634090375, lng: 135.72872765086015 }, category: "japan" },
   { id: 4, title: "日本3: 阿蘇山", answer: { lat: 32.8847, lng: 131.1043 }, category: "japan" },
   { id: 5, title: "日本4: 弘前城", answer: { lat: 40.60707, lng: 140.46412 }, category: "japan" },
   { id: 6, title: "日本5: 松山城", answer: { lat: 33.84584, lng: 132.7654 }, category: "japan" },
@@ -649,17 +696,23 @@ if (useHttps) {
   const keyPath = process.env.HTTPS_KEY_PATH || "";
   const certPath = process.env.HTTPS_CERT_PATH || "";
   if (!keyPath || !certPath) {
+    logger.error("USE_HTTPS is true, but HTTPS_KEY_PATH or HTTPS_CERT_PATH is missing.");
     throw new Error("USE_HTTPS is true, but HTTPS_KEY_PATH or HTTPS_CERT_PATH is missing.");
   }
   const key = fs.readFileSync(keyPath);
   const cert = fs.readFileSync(certPath);
   httpServer = createHttpsServer({ key, cert }, app);
+  logger.info("HTTPS server configured");
 } else {
   httpServer = createServer(app);
+  logger.info("HTTP server configured");
 }
 const wss = new WebSocketServer({ server: httpServer });
 
 wss.on("connection", (ws) => {
+  const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  logger.info(`Client connected: ${clientId}`);
+  
   clients.set(ws, {
     role: "guest",
     name: "",
@@ -688,32 +741,56 @@ wss.on("connection", (ws) => {
         return;
       }
 
-      if (handleJoinMessage(ws, meta, msg)) return;
-      if (handleAdminModeMessage(msg)) return;
+      if (handleJoinMessage(ws, meta, msg)) {
+        logger.info(`Client joined: ${meta.clientId || clientId} as ${meta.role} (${meta.name})`);
+        return;
+      }
+      if (handleAdminModeMessage(msg)) {
+        logger.info(`Mode changed to: ${currentMode}`);
+        return;
+      }
 
       if (meta.role === "admin") {
-        if (handleAdminJumpMessage(msg)) return;
+        if (handleAdminJumpMessage(msg)) {
+          logger.info(`Admin action: ${msg.type} to index ${msg.index || msg.index}`);
+          return;
+        }
         if (currentMode === "geo") {
-          if (handleAdminGeoMessage(msg)) return;
+          if (handleAdminGeoMessage(msg)) {
+            logger.info(`Admin geo action: ${msg.type}`);
+            return;
+          }
           return;
         }
 
         if (currentMode === "good") {
-          if (handleAdminGoodMessage(msg)) return;
+          if (handleAdminGoodMessage(msg)) {
+            logger.info(`Admin good action: ${msg.type}`);
+            return;
+          }
           return;
         }
 
         return;
       }
 
-      if (handleParticipantAnswer(ws, meta, msg)) return;
-      if (handleGoodVote(meta, msg)) return;
-    } catch {
+      if (handleParticipantAnswer(ws, meta, msg)) {
+        logger.debug(`Participant answer from ${meta.name}: Q${geoState.currentQuestionIndex + 1} (${msg.lat}, ${msg.lng})`);
+        return;
+      }
+      if (handleGoodVote(meta, msg)) {
+        logger.debug(`Good vote from participant (performer index: ${goodState.currentIndex})`);
+        return;
+      }
+    } catch (error) {
+      logger.error(`Message parsing error: ${error.message}`);
       send(ws, { type: "error", payload: "メッセージ解析に失敗しました。" });
     }
   });
 
   ws.on("close", () => {
+    const meta = clients.get(ws);
+    logger.info(`Client disconnected: ${meta?.clientId || clientId} (${meta?.name || "guest"})`);
     clients.delete(ws);
     broadcastState();
   });
@@ -731,5 +808,15 @@ app.get("/api/health", (_req, res) => {
 
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
-  console.log(`Server running on https://${process.env.SERVER_DOMAIN}`);
+  logger.info(`Server running on https://${process.env.SERVER_DOMAIN || "localhost"}:${PORT}`);
+});
+
+// グローバルエラーハンドリング
+process.on("unhandledRejection", (reason, promise) => {
+  logger.error(`Unhandled Rejection at: ${promise}, reason: ${reason}`);
+});
+
+process.on("uncaughtException", (error) => {
+  logger.error(`Uncaught Exception: ${error.message}`, error);
+  process.exit(1);
 });
