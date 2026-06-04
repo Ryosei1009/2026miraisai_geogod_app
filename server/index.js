@@ -116,6 +116,20 @@ const goodState = {
 
 const clients = new Map();
 const participantsById = new Map();
+
+// broadcastStateのデバウンス用（answer:update時の高頻度配信を抑制）
+let broadcastDebounceTimer = null;
+const BROADCAST_DEBOUNCE_MS = 300; // 300msの間引き
+
+function debouncedBroadcastState() {
+  if (broadcastDebounceTimer) {
+    clearTimeout(broadcastDebounceTimer);
+  }
+  broadcastDebounceTimer = setTimeout(() => {
+    broadcastDebounceTimer = null;
+    broadcastState();
+  }, BROADCAST_DEBOUNCE_MS);
+}
 const performerStats = performers.map((performer) => ({
   id: performer.id,
   goodCount: 0,
@@ -591,7 +605,8 @@ function handleParticipantAnswer(ws, meta, msg) {
 
   meta.currentPin = { lat, lng };
   meta.answers[geoState.currentQuestionIndex] = { lat, lng };
-  broadcastState();
+  // 高頻度のanswer:updateに対してはデバウンスして配信（負荷軽減）
+  debouncedBroadcastState();
   return true;
 }
 
@@ -792,7 +807,8 @@ wss.on("connection", (ws) => {
     const meta = clients.get(ws);
     logger.info(`Client disconnected: ${meta?.clientId || clientId} (${meta?.name || "guest"})`);
     clients.delete(ws);
-    broadcastState();
+    // 切断時も高頻度になりうるのでデバウンス
+    debouncedBroadcastState();
   });
 });
 
