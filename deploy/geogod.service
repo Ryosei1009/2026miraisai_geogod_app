@@ -1,0 +1,27 @@
+# systemd ユニット: /etc/systemd/system/geogod.service に配置
+# アプリ本体は /root/shino/index.js に配置する前提
+[Unit]
+Description=Miraisai GeoGod WebSocket Server
+After=network.target
+
+[Service]
+Type=simple
+# /root 配下は root しか読めないため root で実行する。
+# （将来 /opt 等へ移す場合は専用ユーザー実行に変更するのが望ましい）
+User=root
+WorkingDirectory=/root/shino
+ExecStart=/usr/bin/node /root/shino/index.js
+Restart=always
+RestartSec=2
+
+# .env は WorkingDirectory の .env が自動で読まれる（dotenv）
+Environment=NODE_ENV=production
+
+# ファイルディスクリプタ上限（Ubuntuのデフォルトは1024）
+LimitNOFILE=65536
+
+# OS用に余裕を残す（マシン全体4GBのため）
+MemoryMax=2G
+
+[Install]
+WantedBy=multi-user.target

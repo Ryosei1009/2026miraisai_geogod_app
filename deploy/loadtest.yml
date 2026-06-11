@@ -1,0 +1,28 @@
+# loadtest.yml
+# 現実的な負荷の再現:
+# - 150接続を生成して維持
+# - 各接続は毎秒1通の answer:update を送る（実際のプレイヤーは300msデバウンス込みで毎秒2通程度）
+#   ※サーバーのレート制限は毎秒10通なので、これは正常範囲
+config:
+  target: "wss://miraisaiapi.shino.zip"
+  phases:
+    # 30秒かけて150接続を立ち上げ、その後維持
+    - duration: 30
+      arrivalRate: 5
+      maxVusers: 500
+  # サーバーの Origin 検証(CSWSH対策)を通すため、正規の Origin を送る。
+  # CLIENT_ORIGIN（＝クライアントページのURL）と完全一致させること（末尾スラッシュなし）。
+  ws:
+    headers:
+      Origin: "https://miraisai.shino.zip"
+engines:
+  ws: {}
+scenarios:
+  - engine: ws
+    flow:
+      - send: '{"type":"join","role":"participant","name":"負荷テスト","clientId":"lt_{{ $uuid }}"}'
+      # 60回 × (送信 + 1秒待機) = 約60秒間、毎秒1通を送り続ける
+      - loop:
+          - send: '{"type":"answer:update","lat":35.6,"lng":139.7}'
+          - think: 1
+        count: 60

@@ -1,4 +1,5 @@
 import cors from "cors";
+import crypto from "crypto";
 import express from "express";
 import dotenv from "dotenv";
 import fs from "fs";
@@ -72,6 +73,35 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 const SCORE_MODE = process.env.SCORE_MODE || "separate";
+
+// 参加者レコードの上限（クライアント任意のclientIdによるメモリ枯渇を防ぐ）
+const MAX_PARTICIPANTS = 500;
+// 管理者キーの認証試行回数上限（接続ごと）
+const MAX_ADMIN_ATTEMPTS = 5;
+// メッセージレート制限（トークンバケット: バースト20通、毎秒10通回復）
+const RATE_BURST = 20;
+const RATE_PER_SECOND = 10;
+const RATE_MAX_VIOLATIONS = 100;
+
+function safeEqual(a, b) {
+  const ab = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  if (ab.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ab, bb);
+}
+
+function allowMessage(ws) {
+  const now = Date.now();
+  const elapsedSec = (now - (ws._rateLastRefill ?? now)) / 1000;
+  ws._rateTokens = Math.min(RATE_BURST, (ws._rateTokens ?? RATE_BURST) + elapsedSec * RATE_PER_SECOND);
+  ws._rateLastRefill = now;
+  if (ws._rateTokens < 1) {
+    ws._rateViolations = (ws._rateViolations ?? 0) + 1;
+    return false;
+  }
+  ws._rateTokens -= 1;
+  return true;
+}
 
 function createGameId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -187,9 +217,9 @@ function buildRanking() {
     .sort((a, b) => b.totalScore - a.totalScore);
 }
 
-function buildGeoStateFor(meta) {
+function buildGeoBase() {
   const currentQuestion = questions[geoState.currentQuestionIndex];
-  const base = {
+  return {
     mode: "geo",
     phase: geoState.phase,
     currentQuestionIndex: geoState.currentQuestionIndex,
@@ -206,24 +236,31 @@ function buildGeoStateFor(meta) {
         }
       : null,
     currentCategory: currentQuestion?.category || null,
-    leaderboard: buildLeaderboard(),
-    ranking: buildRanking(),
     scoreMode: SCORE_MODE,
     gameId,
     revealedAnswer: geoState.phase === "closed" && currentQuestion
       ? currentQuestion.answer
       : null
   };
+}
 
-  if (!meta || meta.role !== "participant") {
-    return base;
+// cache はブロードキャスト1回分の共有キャッシュ。
+// leaderboard / ranking は帯域・CPU削減のため管理者にのみ送る
+// （クライアント側でも GeoAdminView / RankingView が管理者専用）。
+function buildGeoStateFor(meta, cache = {}) {
+  if (!cache.geoBase) cache.geoBase = buildGeoBase();
+  const state = { ...cache.geoBase };
+
+  if (meta?.role === "admin") {
+    if (!cache.leaderboard) cache.leaderboard = buildLeaderboard();
+    if (!cache.ranking) cache.ranking = buildRanking();
+    state.leaderboard = cache.leaderboard;
+    state.ranking = cache.ranking;
   }
 
-  const currentCategory = currentQuestion?.category || "trial";
-
-  return {
-    ...base,
-    player: {
+  if (meta?.role === "participant") {
+    const currentCategory = cache.geoBase.currentCategory || "trial";
+    state.player = {
       name: meta.name,
       totalScore: totalScore(meta.scores),
       scores: meta.scores,
@@ -232,8 +269,10 @@ function buildGeoStateFor(meta) {
       currentAnswer: meta.answers[geoState.currentQuestionIndex] || null,
       hasSubmittedCurrent: Boolean(meta.currentPin),
       lastRound: meta.lastRound
-    }
-  };
+    };
+  }
+
+  return state;
 }
 
 function resetStats() {
@@ -290,21 +329,27 @@ function hasVotedCurrent(meta) {
   return Boolean(meta.clientId && stat.voters.has(meta.clientId));
 }
 
-function buildGoodStateFor(meta) {
+function buildGoodStateFor(meta, cache = {}) {
+  // buildStatsSummary は maxParticipantCount 更新の副作用を持つため、
+  // ブロードキャスト1回につき1度だけ実行する
+  if (!cache.goodStats) {
+    cache.goodAudience = goodAudienceCount();
+    cache.goodStats = buildStatsSummary();
+  }
   return {
     mode: "good",
     phase: goodState.phase,
     currentIndex: goodState.currentIndex,
     totalPerformers: performers.length,
     performers,
-    stats: buildStatsSummary(),
-    audienceCount: goodAudienceCount(),
+    stats: cache.goodStats,
+    audienceCount: cache.goodAudience,
     hasVotedCurrent: hasVotedCurrent(meta)
   };
 }
 
-function buildStateFor(meta) {
-  const baseState = currentMode === "good" ? buildGoodStateFor(meta) : buildGeoStateFor(meta);
+function buildStateFor(meta, cache = {}) {
+  const baseState = currentMode === "good" ? buildGoodStateFor(meta, cache) : buildGeoStateFor(meta, cache);
   return {
     ...baseState,
     selfRole: meta?.role || "guest"
@@ -317,9 +362,32 @@ function send(ws, message) {
   }
 }
 
-function broadcastState() {
+function doBroadcast() {
+  const cache = {};
   for (const [ws, meta] of clients.entries()) {
-    send(ws, { type: "state", payload: buildStateFor(meta) });
+    send(ws, { type: "state", payload: buildStateFor(meta, cache) });
+  }
+}
+
+// ブロードキャストのスロットリング:
+// 直近の送信から間隔が空いていれば即時送信（管理者操作の体感を保つ）、
+// 連続発火時は末尾に1回へ集約して増幅DoS・帯域飽和を防ぐ
+const BROADCAST_MIN_INTERVAL_MS = 500;
+let lastBroadcastAt = 0;
+let broadcastTimer = null;
+
+function broadcastState() {
+  const now = Date.now();
+  const elapsed = now - lastBroadcastAt;
+  if (elapsed >= BROADCAST_MIN_INTERVAL_MS) {
+    lastBroadcastAt = now;
+    doBroadcast();
+  } else if (!broadcastTimer) {
+    broadcastTimer = setTimeout(() => {
+      broadcastTimer = null;
+      lastBroadcastAt = Date.now();
+      doBroadcast();
+    }, BROADCAST_MIN_INTERVAL_MS - elapsed);
   }
 }
 
@@ -333,7 +401,14 @@ function handleJoinMessage(ws, meta, msg) {
       send(ws, { type: "state", payload: buildStateFor(meta) });
       return true;
     }
-    if (adminKey !== ADMIN_KEY) {
+    ws._adminAttempts = (ws._adminAttempts ?? 0) + 1;
+    if (ws._adminAttempts > MAX_ADMIN_ATTEMPTS) {
+      logger.warn(`Admin auth attempt limit exceeded (${ws._adminAttempts} tries)`);
+      send(ws, { type: "error", payload: "認証試行回数の上限に達しました。" });
+      ws.close(1008, "too many auth attempts");
+      return true;
+    }
+    if (!safeEqual(adminKey, ADMIN_KEY)) {
       send(ws, { type: "error", payload: "管理者認証に失敗しました。" });
       send(ws, { type: "state", payload: buildStateFor(meta) });
       return true;
@@ -344,6 +419,12 @@ function handleJoinMessage(ws, meta, msg) {
   } else if (msg.role === "participant") {
     const clientId = String(msg.clientId || "").trim();
     const stored = clientId ? participantsById.get(clientId) : null;
+    if (!stored && participantsById.size >= MAX_PARTICIPANTS) {
+      logger.warn(`Participant limit reached (${participantsById.size}), join rejected`);
+      send(ws, { type: "error", payload: "参加者数が上限に達しました。" });
+      send(ws, { type: "state", payload: buildStateFor(meta) });
+      return true;
+    }
     const name = String(msg.name || stored?.name || "名無し").trim().slice(0, 24) || "名無し";
     const participant = stored || {
       role: "participant",
@@ -389,6 +470,9 @@ function handleJoinMessage(ws, meta, msg) {
     clients.set(ws, meta);
   }
 
+  // 全体へのブロードキャストはスロットリングされるため、
+  // 参加した本人には即時に最新stateを返す
+  send(ws, { type: "state", payload: buildStateFor(clients.get(ws)) });
   broadcastState();
   return true;
 }
@@ -432,8 +516,11 @@ function handleAdminGeoMessage(msg) {
     const isLast = geoState.currentQuestionIndex >= questions.length - 1;
     geoState.phase = isLast ? "finished" : "closed";
 
-    for (const [clientWs] of clients.entries()) {
-      send(clientWs, { type: "roundResult", payload: roundResults });
+    // roundResult はクライアント側で AdminView のみが使用するため管理者にのみ送る
+    for (const [clientWs, clientMeta] of clients.entries()) {
+      if (clientMeta.role === "admin") {
+        send(clientWs, { type: "roundResult", payload: roundResults });
+      }
     }
     broadcastState();
     return true;
@@ -707,12 +794,56 @@ if (useHttps) {
   httpServer = createServer(app);
   logger.info("HTTP server configured");
 }
-const wss = new WebSocketServer({ server: httpServer });
+// CLIENT_ORIGIN 設定時のみ Origin を検証する（CSWSH対策）。
+// 未設定時は全許可（設定ミスによる当日の全断を避けるための安全弁）。
+function isOriginAllowed(origin) {
+  if (!CLIENT_ORIGIN) return true;
+  return origin === CLIENT_ORIGIN.replace(/\/$/, "");
+}
+
+const wss = new WebSocketServer({
+  server: httpServer,
+  // 正規メッセージは数百バイト以下。巨大フレームによるメモリDoSを防ぐ
+  maxPayload: 4 * 1024,
+  verifyClient: (info) => {
+    if (!isOriginAllowed(info.origin)) {
+      logger.warn(`WebSocket connection rejected: origin=${info.origin}`);
+      return false;
+    }
+    return true;
+  }
+});
+
+// 無応答クライアントの切断（プロトコルレベルping。ブラウザは自動でpong応答する）
+const HEARTBEAT_INTERVAL_MS = 30000;
+const heartbeatTimer = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (ws.isAlive === false) {
+      ws.terminate();
+      continue;
+    }
+    ws.isAlive = false;
+    ws.ping();
+  }
+}, HEARTBEAT_INTERVAL_MS);
+
+wss.on("close", () => clearInterval(heartbeatTimer));
 
 wss.on("connection", (ws) => {
   const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   logger.info(`Client connected: ${clientId}`);
-  
+
+  ws.isAlive = true;
+  ws.on("pong", () => {
+    ws.isAlive = true;
+  });
+
+  // errorハンドラ必須: 未登録だと maxPayload 超過などのソケットエラーが
+  // uncaughtException となりサーバープロセス全体が落ちる
+  ws.on("error", (error) => {
+    logger.warn(`WebSocket error from ${clients.get(ws)?.clientId || clientId}: ${error.message}`);
+  });
+
   clients.set(ws, {
     role: "guest",
     name: "",
@@ -727,6 +858,15 @@ wss.on("connection", (ws) => {
 
   ws.on("message", (raw) => {
     try {
+      // メッセージレート制限（超過分は破棄、悪質な場合は切断）
+      if (!allowMessage(ws)) {
+        if (ws._rateViolations > RATE_MAX_VIOLATIONS) {
+          logger.warn(`Rate limit abuse, closing connection: ${clients.get(ws)?.clientId || clientId}`);
+          ws.close(1008, "rate limit exceeded");
+        }
+        return;
+      }
+
       const msg = JSON.parse(raw.toString());
       const meta = clients.get(ws);
       if (!meta) return;
@@ -745,12 +885,13 @@ wss.on("connection", (ws) => {
         logger.info(`Client joined: ${meta.clientId || clientId} as ${meta.role} (${meta.name})`);
         return;
       }
-      if (handleAdminModeMessage(msg)) {
-        logger.info(`Mode changed to: ${currentMode}`);
-        return;
-      }
 
       if (meta.role === "admin") {
+        // モード切替は管理者専用（ロールチェック前に置くと誰でも切替できてしまう）
+        if (handleAdminModeMessage(msg)) {
+          logger.info(`Mode changed to: ${currentMode}`);
+          return;
+        }
         if (handleAdminJumpMessage(msg)) {
           logger.info(`Admin action: ${msg.type} to index ${msg.index || msg.index}`);
           return;

@@ -121,6 +121,7 @@ export default function App() {
     const heartbeatIntervalRef = useRef(null);
     const heartbeatTimeoutRef = useRef(null);
     const adminKeyRef = useRef("");
+    const pinSendTimeoutRef = useRef(null);
 
     useEffect(() => {
         joinedRef.current = joined;
@@ -193,6 +194,10 @@ export default function App() {
             window.removeEventListener("online", handleOnline);
             clearReconnectTimeout();
             clearHeartbeatInterval();
+            if (pinSendTimeoutRef.current) {
+                clearTimeout(pinSendTimeoutRef.current);
+                pinSendTimeoutRef.current = null;
+            }
             if (wsRef.current) {
                 wsRef.current.close();
             }
@@ -220,6 +225,21 @@ export default function App() {
             clearTimeout(heartbeatTimeoutRef.current);
             heartbeatTimeoutRef.current = null;
         }
+    };
+
+    // 自動再接続のスケジュール（指数バックオフ + ジッタ）
+    // ジッタは大人数が同時切断されたときの一斉再接続（再接続の嵐）を分散させるため
+    const scheduleReconnect = () => {
+        clearReconnectTimeout();
+        const base = reconnectAttemptsRef.current === 0
+            ? 500
+            : Math.min(500 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
+        const delay = base + Math.random() * 1000;
+
+        reconnectAttemptsRef.current += 1;
+        reconnectTimeoutRef.current = setTimeout(() => {
+            connectWebSocket();
+        }, delay);
     };
 
     const connectWebSocket = () => {
@@ -379,31 +399,13 @@ export default function App() {
         ws.onclose = () => {
             clearHeartbeatInterval();
             setSocketReady(false);
-
-            // 自動再接続（初期遅延は短く、指数バックオフで段階的に増加）
-            const delay = reconnectAttemptsRef.current === 0
-                ? 500  // 最初は500msで即座に再接続
-                : Math.min(500 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
-
-            reconnectAttemptsRef.current += 1;
-            reconnectTimeoutRef.current = setTimeout(() => {
-                connectWebSocket();
-            }, delay);
+            scheduleReconnect();
         };
 
-        ws.onerror = (error) => {
+        ws.onerror = () => {
             clearHeartbeatInterval();
             setSocketReady(false);
-
-            // エラーが発生した場合も即座に再接続を試みる
-            const delay = reconnectAttemptsRef.current === 0
-                ? 500  // 最初は500msで即座に再接続
-                : Math.min(500 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
-
-            reconnectAttemptsRef.current += 1;
-            reconnectTimeoutRef.current = setTimeout(() => {
-                connectWebSocket();
-            }, delay);
+            scheduleReconnect();
         };
 
         return () => {
@@ -415,11 +417,13 @@ export default function App() {
 
     useEffect(() => {
         if (!socketReady) return;
+        // サーバーが状態変化をプッシュするため、ポーリングは取りこぼし補償用。
+        // 3秒だと150人で常時帯域を圧迫するため10秒に緩和
         const timer = window.setInterval(() => {
             if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                 send({ type: "state:request" });
             }
-        }, 3000);
+        }, 10000);
 
         return () => window.clearInterval(timer);
     }, [socketReady]);
@@ -482,7 +486,15 @@ export default function App() {
     const handlePick = (nextPin) => {
         setPin(nextPin);
         if (!canAnswer) return;
-        send({ type: "answer:update", lat: nextPin.lat, lng: nextPin.lng });
+        // ピン移動の連打をデバウンス（最後の位置だけを300ms後に送信）して
+        // サーバーへの送信量とブロードキャスト誘発を抑える
+        if (pinSendTimeoutRef.current) {
+            clearTimeout(pinSendTimeoutRef.current);
+        }
+        pinSendTimeoutRef.current = setTimeout(() => {
+            pinSendTimeoutRef.current = null;
+            send({ type: "answer:update", lat: nextPin.lat, lng: nextPin.lng });
+        }, 300);
     };
 
     const handleGood = () => {
