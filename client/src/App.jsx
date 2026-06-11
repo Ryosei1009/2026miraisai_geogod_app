@@ -290,7 +290,8 @@ export default function App() {
                 if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                     send({ type: "ping" });
 
-                    // ハートビート応答タイムアウト設定（10秒以内にpongが来ないと再接続）
+                    // ハートビート応答タイムアウト設定（30秒以内にpongが来ないと再接続）
+                    // サーバー負荷時にも余裕を持たせるため長めに設定
                     heartbeatTimeoutRef.current = setTimeout(() => {
                         console.warn("Heartbeat timeout - reconnecting...");
                         clearHeartbeatInterval();
@@ -301,7 +302,7 @@ export default function App() {
                         reconnectTimeoutRef.current = setTimeout(() => {
                             connectWebSocket();
                         }, 500);
-                    }, 10000);  // 10秒でタイムアウト
+                    }, 30000);  // 30秒でタイムアウト（負荷時の余裕を確保）
                 }
             }, 30000); // 30秒ごと
         };
@@ -433,6 +434,7 @@ export default function App() {
             if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                 send({ type: "state:request" });
             }
+        }, 10000);
         }, 10000);
 
         return () => window.clearInterval(timer);
