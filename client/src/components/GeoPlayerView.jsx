@@ -82,22 +82,34 @@ export default function GeoPlayerView({ phase, player, currentCategory, playerAn
                     </GoogleMap>
                 )}
 
+                {phase !== "waiting" && (
+                    <div className="pointer-events-none absolute left-1/2 top-4 z-10 -translate-x-1/2">
+                        <span
+                            className={`rounded-full px-4 py-1.5 text-xs font-bold tracking-wider shadow-lg ${
+                                phase === "active" ? "bg-main text-[var(--accent-fg)]" : "bg-card-soft border border-theme text-muted"
+                            }`}
+                        >
+                            {phase === "active" ? "回答受付中" : "回答締切"}
+                        </span>
+                    </div>
+                )}
+
                 <div className="pointer-events-none absolute inset-0 flex flex-col justify-end p-2 md:p-6">
                     {phase !== "waiting" && (
                         <div className="pointer-events-auto w-full max-w-none space-y-2 md:max-w-sm">
                             {error && <p className="alert-error rounded-lg p-2 text-sm">{error}</p>}
-                            <div className="rounded-2xl border border-[var(--main-color)]/20 bg-[#050a30]/95 p-3 shadow-lg backdrop-blur md:p-4">
-                                <div className="mt-1 md:mt-2 flex ">
+                            <div className="glass-card doc-card bg-card/95 p-3 shadow-lg backdrop-blur md:p-4">
+                                <div className="mt-1 flex md:mt-2">
                                     <div className="w-2/3">
-                                        <p className="text-[11px] uppercase tracking-widest text-muted">参加者</p>
+                                        <p className="heading-chip text-[11px] uppercase tracking-widest text-muted">参加者</p>
                                         <h2 className="text-xl font-extrabold text-primary md:text-2xl">{player?.name || "-"}</h2>
                                     </div>
                                     <div className="w-1/3">
-                                        <p className="text-[11px] uppercase tracking-widest text-muted">現在の{activeLabel}スコア</p>
-                                        <p className="text-3xl font-extrabold text-accent -mt-1 md:text-4xl">{activeScore}</p>
+                                        <p className="text-[11px] uppercase tracking-widest text-muted">{activeLabel}スコア</p>
+                                        <p className="num -mt-1 text-3xl font-extrabold text-accent md:text-4xl">{activeScore}</p>
                                     </div>
                                 </div>
-                                <div className="mt-2 grid gap-1 text-muted mt-3 grid-cols-2 text-sm">
+                                <div className="num mt-3 grid grid-cols-2 gap-1 border-t border-theme pt-2 text-sm text-muted">
                                     <p>前問距離: {formatDistance(lastRound.distanceKm)}</p>
                                     <p>前問得点: {lastRound.gained ?? 0}</p>
                                 </div>
@@ -107,8 +119,9 @@ export default function GeoPlayerView({ phase, player, currentCategory, playerAn
 
                     {phase === "waiting" && (
                         <div className="pointer-events-auto mx-auto w-full max-w-xl p-2 md:pb-0">
-                            <div className="rounded-2xl border border-[var(--main-color)]/20 bg-[var(--card-bg)]/95 p-6 text-center shadow-lg backdrop-blur">
-                                <h3 className="text-3xl font-extrabold text-primary">開始待機中</h3>
+                            <div className="glass-card doc-card bg-card/95 p-6 text-center shadow-lg backdrop-blur">
+                                <p className="heading-chip justify-center text-xs font-bold uppercase tracking-[0.18em] text-subtle">PAVILION 01</p>
+                                <h3 className="mt-2 text-3xl font-extrabold text-primary">開始待機中</h3>
                                 <p className="mt-3 text-muted">運営がゲーム開始を押すまでお待ちください。</p>
                             </div>
                         </div>

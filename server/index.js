@@ -304,11 +304,16 @@ function buildStatsSummary() {
   return performerStats.map((stat, index) => {
     const isCurrent = goodState.phase === "live" && index === goodState.currentIndex;
     const goodCount = isCurrent && !stat.locked ? stat.voters.size : stat.goodCount;
-    let participantCount = isCurrent && !stat.locked ? liveAudience : stat.participantCount;
     // 投票中は最大接続者数を更新
     if (isCurrent && !stat.locked) {
       stat.maxParticipantCount = Math.max(stat.maxParticipantCount, liveAudience);
     }
+    // 分母は投票期間中の最大接続者数（high-water mark）。
+    // ライブ接続数をそのまま使うと、投票後に退出した人のぶん分母が減って
+    // Good率が100%を超えてしまう。投票者数を下回らないようにも保証する。
+    const participantCount = isCurrent && !stat.locked
+      ? Math.max(stat.maxParticipantCount, goodCount)
+      : Math.max(stat.participantCount, stat.goodCount);
     return {
       id: stat.id,
       no: performers[index]?.no || "",
@@ -771,8 +776,8 @@ function lockCurrentStats() {
   const stat = performerStats[goodState.currentIndex];
   if (!stat) return;
   stat.goodCount = stat.voters.size;
-  // 投票期間中の最大接続者数を参加者数として固定
-  stat.participantCount = stat.maxParticipantCount;
+  // 投票期間中の最大接続者数を参加者数として固定（投票者数を下回らないよう保証）
+  stat.participantCount = Math.max(stat.maxParticipantCount, stat.goodCount);
   stat.locked = true;
 }
 

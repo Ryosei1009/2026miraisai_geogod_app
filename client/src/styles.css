@@ -1,112 +1,304 @@
-.theme-lava {
-    /* borealis dark */
-    --bg-color: #01010b;
-    --main-color: #00ff87;
-    --accent-color: #60efff;
-    --text-color: #ffffff;
-    --card-bg: #050a30;
+@import "tailwindcss";
 
-    --text-muted: rgba(255, 255, 255, 0.75);
-    --text-subtle: rgba(255, 255, 255, 0.6);
-    --border-color: rgba(255, 255, 255, 0.18);
-    --overlay-color: rgba(32, 35, 42, 0.7);
-    --card-soft: rgba(40, 44, 52, 0.85);
+/* ============================================================
+   IPUT EXPO theme — 魅儡祭「個性の融合」
+   8色（RGB + CMY + 黒白）は混在しても混ざらない（ハードストップ）。
+   参加者側 = theme-expo-dark / 運営・ランキング側 = theme-expo-light
+   ============================================================ */
+
+:root {
+    /* 使用色は赤・青・黄・黒・白の5色のみ（モンドリアン配色） */
+    --expo-red: #e60012;
+    --expo-yellow: #f6c800;
+    --expo-blue: #0068b7;
+    --expo-black: #16161a;
+    --expo-white: #ffffff;
+
+    /* ハードストップ＋白い目地＝隣接するが決して混ざらない */
+    --spine: linear-gradient(90deg,
+        var(--expo-red) 0 24%, var(--expo-white) 0 25.5%,
+        var(--expo-yellow) 0 49%, var(--expo-white) 0 50.5%,
+        var(--expo-blue) 0 74%, var(--expo-white) 0 75.5%,
+        var(--expo-black) 0 100%);
 }
 
-body.theme-lava {
+/* ボタンは常にポインターカーソル（Tailwind v4 のプリフライトは default のため） */
+button:not(:disabled) {
+    cursor: pointer;
+}
+
+/* ---------- ライト（運営・ランキング） ---------- */
+.theme-expo-light {
+    --bg-color: #fafafa;
+    --card-bg: #ffffff;
+    --card-soft: #f4f4f6;
+    --overlay-color: rgba(22, 22, 26, 0.45);
+    --text-color: #16161a;
+    --text-muted: #5a5a64;
+    --text-subtle: #8a8a94;
+    --border-color: #e4e4e9;
+
+    --pav-geo: var(--expo-blue);
+    --pav-good: var(--expo-red);
+    --pav-rank: #c79f00;
+    --pav-admin: var(--expo-black);
+    --accent-fg: #ffffff;
+    --danger: #b3261e;
+    --danger-soft: #fdebec;
+    --danger-border: #f3b8bd;
+}
+
+/* ---------- ダーク（参加者） ---------- */
+.theme-expo-dark {
+    --bg-color: #0e0e14;
+    --card-bg: #17171f;
+    --card-soft: #20202a;
+    --overlay-color: rgba(8, 8, 12, 0.7);
+    --text-color: #f4f4f6;
+    --text-muted: rgba(244, 244, 246, 0.72);
+    --text-subtle: rgba(244, 244, 246, 0.5);
+    --border-color: rgba(255, 255, 255, 0.14);
+
+    --pav-geo: #57aef5;
+    --pav-good: #ff6b66;
+    --pav-rank: #ffd84d;
+    --pav-admin: #f4f4f6;
+    --accent-fg: #0e0e14;
+    --danger: #ff8a80;
+    --danger-soft: rgba(230, 0, 18, 0.18);
+    --danger-border: rgba(255, 138, 128, 0.45);
+}
+
+/* パビリオンカラー（画面の担当色）。--main-color は旧名の互換エイリアス */
+body[data-pavilion="geo"]   { --accent: var(--pav-geo); }
+body[data-pavilion="good"]  { --accent: var(--pav-good); }
+body[data-pavilion="rank"]  { --accent: var(--pav-rank); }
+body[data-pavilion="admin"] { --accent: var(--pav-admin); }
+body { --accent: var(--pav-geo); --main-color: var(--accent); --accent-color: var(--accent); }
+body[data-pavilion="admin"].theme-expo-light { --accent-fg: #ffffff; }
+body[data-pavilion="admin"].theme-expo-dark  { --accent-fg: #0e0e14; }
+body[data-pavilion="rank"].theme-expo-dark   { --accent-fg: #0e0e14; }
+
+body.theme-expo-light,
+body.theme-expo-dark {
     background: var(--bg-color);
     color: var(--text-color);
+    font-family: "Noto Sans JP", "Inter", system-ui, sans-serif;
+    font-feature-settings: "palt";
 }
 
-body.good-flash {
-    background: radial-gradient(circle at top, rgba(0, 255, 135, 0.25), rgba(1, 1, 11, 0.95) 60%);
+/* ---------- 全画面共通パーツ ---------- */
+
+/* 虹の背骨（全画面上部） */
+.expo-spine {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 6px;
+    background: var(--spine);
+    z-index: 60;
 }
 
-.text-primary {
-	color: var(--text-color);
+/* 接続バナー（未接続時に即時表示） */
+.conn-banner {
+    position: fixed;
+    top: 6px; left: 0; right: 0;
+    z-index: 50;
+    padding: 0.75rem 1rem;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.875rem;
+    background: var(--expo-yellow);
+    color: #16161a;
 }
 
-.text-muted {
-	color: var(--text-muted);
+/* 背景の色面：赤・青・黄の純色を四隅に置く（重ねず、混ぜない） */
+.page-shell { position: relative; }
+.page-shell::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.08;
+    background:
+        radial-gradient(420px 360px at 10% -8%, var(--expo-blue) 0 55%, transparent 60%),
+        radial-gradient(440px 380px at 98% 12%, var(--expo-red) 0 55%, transparent 60%),
+        radial-gradient(520px 420px at 60% 110%, var(--expo-yellow) 0 55%, transparent 60%);
+}
+.theme-expo-dark .page-shell::before { opacity: 0.14; }
+
+/* カード：Wordの見出しスタイルのように左辺へ担当色バー */
+.glass-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(22, 22, 26, 0.05);
+}
+.doc-card {
+    border-left: 3px solid var(--accent);
+    border-radius: 0 16px 16px 0;
 }
 
-.text-subtle {
-	color: var(--text-subtle);
+/* 見出しの色チップ */
+.heading-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+.heading-chip::before {
+    content: "";
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    background: var(--accent);
 }
 
-.text-accent {
-	color: var(--main-color);
-}
+/* ---------- テキスト・背景ユーティリティ（旧クラス名を維持） ---------- */
+.text-primary { color: var(--text-color); }
+.text-muted { color: var(--text-muted); }
+.text-subtle { color: var(--text-subtle); }
+.text-accent { color: var(--accent); }
+.text-accent-strong { color: var(--accent); }
+.bg-main { background: var(--accent); }
+.bg-accent { background: var(--accent); }
+.bg-card { background: var(--card-bg); }
+.bg-card-soft { background: var(--card-soft); }
+.bg-overlay { background: var(--overlay-color); }
+.border-theme { border-color: var(--border-color); }
 
-.text-accent-strong {
-	color: var(--accent-color);
-}
-
-.bg-main {
-	background: var(--main-color);
-}
-
-.bg-accent {
-	background: var(--accent-color);
-}
-
-.bg-card {
-	background: var(--card-bg);
-}
-
-.bg-card-soft {
-	background: var(--card-soft);
-}
-
-.bg-overlay {
-	background: var(--overlay-color);
-}
-
-.border-theme {
-	border-color: var(--border-color);
-}
-
+/* ---------- ボタン：塗り＝今すべき操作、アウトライン＝それ以外 ---------- */
 .btn-main {
-	background: var(--main-color);
-	color: var(--bg-color);
+    background: var(--accent);
+    color: var(--accent-fg);
+    transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
 }
-
+.btn-main:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 30%, transparent);
+}
 .btn-main:disabled {
-	background: rgba(97, 218, 251, 0.4);
-	color: var(--bg-color);
+    background: var(--card-soft);
+    color: var(--text-subtle);
 }
-
 .btn-accent {
-	background: var(--accent-color);
-	color: var(--text-color);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--accent);
 }
-
-.btn-accent:disabled {
-	background: rgba(250, 200, 99, 0.5);
-}
-
+.btn-accent:disabled { opacity: 0.5; }
 .btn-dark {
-	background: var(--card-bg);
-	color: var(--text-color);
+    background: var(--card-soft);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
 }
-
 .btn-outline {
-	border: 1px solid var(--border-color);
-	color: var(--text-color);
-	background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    background: transparent;
+}
+.btn-danger {
+    border: 1px solid var(--danger-border);
+    color: var(--danger);
+    background: transparent;
 }
 
 .input-field {
-	background: var(--card-bg);
-	color: var(--text-color);
-	border-color: var(--border-color);
+    background: var(--card-soft);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 12px 12px 0;
 }
-
 .input-field:focus {
-	border-color: var(--main-color);
+    border-color: var(--accent);
+    background: var(--card-bg);
 }
 
 .alert-error {
-	background: rgba(250, 200, 99, 0.25);
-	color: var(--accent-color);
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+/* スコア等の数字は桁ガタつき防止 */
+.num {
+    font-variant-numeric: tabular-nums;
+    font-family: "Inter", "Noto Sans JP", sans-serif;
+}
+
+/* ---------- Goodボタン：8色パレットリング ---------- */
+.good-ring {
+    border-radius: 9999px;
+    padding: 14px;
+    background: conic-gradient(
+        var(--expo-red) 0 80deg, var(--expo-white) 0 90deg,
+        var(--expo-yellow) 0 170deg, var(--expo-white) 0 180deg,
+        var(--expo-blue) 0 260deg, var(--expo-white) 0 270deg,
+        var(--expo-black) 0 350deg, var(--expo-white) 0 360deg);
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.good-ring:active:not(:disabled) { transform: scale(0.95); }
+.good-ring:disabled { cursor: not-allowed; opacity: 0.75; }
+.good-ring.voted { animation: ring-spin 0.6s ease; }
+@keyframes ring-spin {
+    from { transform: rotate(0deg) scale(1.04); }
+    to { transform: rotate(45deg) scale(1); }
+}
+.good-core {
+    width: 100%;
+    height: 100%;
+    border-radius: 9999px;
+    background: var(--card-bg);
+    color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+.good-core.voted {
+    background: var(--expo-black);
+    color: #ffffff;
+}
+
+/* 投票時のフラッシュ（参加者画面） */
+body.good-flash {
+    background: radial-gradient(circle at center, rgba(230, 0, 18, 0.28), var(--bg-color) 62%);
+}
+
+/* 出演者プログレスドット */
+.progress-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background: var(--card-soft);
+    border: 1px solid var(--border-color);
+}
+.progress-dot.done { background: var(--accent); border-color: var(--accent); }
+.progress-dot.current {
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+/* ---------- 投票ドット演出（運営側スクリーン） ----------
+   1票 = 1人の色。降ってきて画面下に積もる。 */
+.vote-dot-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 40;
+}
+.vote-dot {
+    position: absolute;
+    top: -16px;
+    width: 12px;
+    height: 12px;
+    border-radius: 9999px;
+    animation: dot-fall 1.4s cubic-bezier(0.3, 0, 0.7, 1.1) forwards;
+}
+@keyframes dot-fall {
+    0% { transform: translateY(0); opacity: 0; }
+    12% { opacity: 1; }
+    100% { transform: translateY(var(--fall-distance)); opacity: 0.9; }
 }

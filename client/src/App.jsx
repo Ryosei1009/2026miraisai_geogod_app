@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import AdminView from "./components/AdminView";
 import ConfirmModal from "./components/ConfirmModal";
+import ExpoShell from "./components/ExpoShell";
 import PlayerView from "./components/PlayerView";
 import RankingView from "./components/RankingView";
 
@@ -107,6 +108,15 @@ export default function App() {
     const [goodFlash, setGoodFlash] = useState(false);
 
     const isAdmin = gameState.selfRole === "admin";
+
+    // テーマとパビリオンカラーの切り替え：
+    // 運営側（管理画面・ランキング・管理者ログイン）＝ライト、参加者側＝ダーク
+    useEffect(() => {
+        const opsSide = isAdmin || isRankView || wantsAdmin;
+        document.body.classList.toggle("theme-expo-light", opsSide);
+        document.body.classList.toggle("theme-expo-dark", !opsSide);
+        document.body.dataset.pavilion = isRankView ? "rank" : isAdmin || wantsAdmin ? "admin" : gameState.mode === "good" ? "good" : "geo";
+    }, [isAdmin, isRankView, wantsAdmin, gameState.mode]);
 
     const wsRef = useRef(null);
     const joinedRef = useRef(false);
@@ -544,11 +554,13 @@ export default function App() {
         resetConfirmState();
     };
 
+    // 出演者が変わった・投票が無効になったらフラッシュを解除する
+    // （currentIndex の変化時も phase は "live" のままなので、未投票状態を見て解除する）
     useEffect(() => {
-        if (mode !== "good" || phase !== "live") {
+        if (mode !== "good" || phase !== "live" || !gameState.hasVotedCurrent) {
             setGoodFlash(false);
         }
-    }, [mode, phase, currentIndex]);
+    }, [mode, phase, currentIndex, gameState.hasVotedCurrent]);
 
     useEffect(() => {
         if (goodFlash) {
@@ -564,14 +576,14 @@ export default function App() {
 
     if (!joined) {
         return (
-            <>
-                {socketReady ? null : (
-                    <div className="fixed w-full top-0 left-0 right-0 bg-amber-100 text-amber-800 p-4 text-center font-semibold z-50">接続されていません。</div>
-                )}
+            <ExpoShell socketReady={socketReady}>
                 <main className={`page-shell min-h-screen p-4 md:p-10`}>
-                    <section className="glass-card mx-auto mt-10 max-w-xl p-8">
-                        <h1 className="mt-2 text-3xl font-extrabold text-primary">{mode === "good" ? "ゴッドタレント" : "ジオゲッサー"}</h1>
-                        <p className="">司会者の指示に従ってください。</p>
+                    <section className="glass-card doc-card mx-auto mt-14 max-w-xl p-8">
+                        <p className="heading-chip text-xs font-bold uppercase tracking-[0.18em] text-subtle">
+                            {wantsAdmin ? "STAFF GATE" : mode === "good" ? "PAVILION 02" : "PAVILION 01"}
+                        </p>
+                        <h1 className="mt-3 text-3xl font-black text-primary">{mode === "good" ? "ゴッドタレント" : "ジオゲッサー"}</h1>
+                        <p className="mt-2 text-sm text-muted">司会者の指示に従ってください。</p>
 
                         {!wantsAdmin && mode === "geo" && (
                             <div className="mt-7">
@@ -580,30 +592,30 @@ export default function App() {
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     maxLength={24}
-                                    className="input-field mt-2 w-full rounded-xl border px-4 py-3 outline-none ring-0 transition"
+                                    className="input-field mt-2 w-full px-4 py-3 outline-none ring-0 transition"
                                 />
                             </div>
                         )}
 
                         {!joined && showAdminPanel && (
-                            <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-4">
+                            <div className="mt-6 rounded-xl border border-theme bg-card-soft p-4">
                                 <label className="block text-sm font-bold text-muted">管理者キー</label>
                                 <input
                                     value={adminKey}
                                     onChange={(e) => setAdminKey(e.target.value)}
                                     type="password"
-                                    className="input-field mt-2 w-full rounded-xl border px-4 py-3 outline-none ring-0 transition"
+                                    className="input-field mt-2 w-full px-4 py-3 outline-none ring-0 transition"
                                 />
                                 <div className="mt-3 flex items-center justify-end gap-2">
                                     <button
                                         onClick={() => setShowAdminPanel(false)}
-                                        className="rounded-lg border border-white/10 px-3 py-1 text-xs font-semibold text-muted"
+                                        className="btn-outline rounded-lg px-3 py-1 text-xs font-semibold text-muted"
                                     >
                                         閉じる
                                     </button>
                                     <button
                                         onClick={() => setWantsAdmin(true)}
-                                        className="rounded-lg bg-white/10 px-3 py-1 text-xs font-semibold"
+                                        className="btn-accent rounded-lg px-3 py-1 text-xs font-semibold"
                                     >
                                         運営者として入る
                                     </button>
@@ -623,27 +635,24 @@ export default function App() {
                         </button>
                     </section>
                 </main>
-            </>
+            </ExpoShell>
         );
     }
 
     if (isRankView) {
         return (
-            <>
-                {socketReady ? null : (
-                    <div className="fixed w-full top-0 left-0 right-0 bg-amber-100 text-amber-800 p-4 text-center font-semibold z-50">接続されていません。</div>
-                )}
+            <ExpoShell socketReady={socketReady}>
                 {!isAdmin ? (
                     <main className="page-shell min-h-screen p-4 md:p-10">
-                        <section className="glass-card mx-auto mt-10 max-w-xl p-8">
-                            <h1 className="mt-2 text-2xl font-extrabold text-primary">ランキング</h1>
+                        <section className="glass-card doc-card mx-auto mt-14 max-w-xl p-8">
+                            <h1 className="heading-chip mt-2 text-2xl font-extrabold text-primary">ランキング</h1>
                             <p className="mt-3 text-muted">このページは運営のみ閲覧できます。</p>
                         </section>
                     </main>
                 ) : mode !== "geo" ? (
                     <main className="page-shell min-h-screen p-4 md:p-10">
-                        <section className="glass-card mx-auto mt-10 max-w-xl p-8">
-                            <h1 className="mt-2 text-2xl font-extrabold text-primary">ランキング</h1>
+                        <section className="glass-card doc-card mx-auto mt-14 max-w-xl p-8">
+                            <h1 className="heading-chip mt-2 text-2xl font-extrabold text-primary">ランキング</h1>
                             <p className="mt-3 text-muted">ジオゲッサー企画でのみ表示されます。</p>
                         </section>
                     </main>
@@ -655,16 +664,13 @@ export default function App() {
                         socketReady={socketReady}
                     />
                 )}
-            </>
+            </ExpoShell>
         );
     }
 
     if (isAdmin) {
         return (
-            <>
-                {socketReady ? null : (
-                    <div className="fixed w-full top-0 left-0 right-0 bg-amber-100 text-amber-800 p-4 text-center font-semibold z-50">接続されていません。</div>
-                )}
+            <ExpoShell socketReady={socketReady}>
                 <AdminView
                     mode={mode}
                     onSwitchMode={(nextMode) =>
@@ -729,15 +735,12 @@ export default function App() {
                     onConfirm={handleConfirm}
                     onCancel={handleCancel}
                 />
-            </>
+            </ExpoShell>
         );
     }
 
     return (
-        <>
-            {socketReady ? null : (
-                <div className="fixed w-full top-0 left-0 right-0 bg-amber-100 text-amber-800 p-4 text-center font-semibold z-50">接続されていません。</div>
-            )}
+        <ExpoShell socketReady={socketReady}>
             <PlayerView
                 mode={mode}
                 phase={phase}
@@ -763,6 +766,6 @@ export default function App() {
                 formatDistance={formatDistance}
                 socketReady={socketReady}
             />
-        </>
+        </ExpoShell>
     );
 }
