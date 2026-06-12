@@ -59,8 +59,8 @@ export default function GeoPlayerView({ phase, player, currentCategory, playerAn
     const lastRound = player?.lastRound || {};
 
     return (
-        <main className="page-shell min-h-screen">
-            <div className="relative h-screen w-full">
+        <main className="page-shell h-screen-safe overflow-hidden">
+            <div className="relative h-full w-full">
 
                 {showMapLoading && (
                     <div className="flex h-full w-full items-center justify-center bg-card p-6 text-center">

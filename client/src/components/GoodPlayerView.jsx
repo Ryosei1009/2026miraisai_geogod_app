@@ -34,8 +34,8 @@ export default function GoodPlayerView({
     }, [hasVotedCurrent, currentPerformer?.no]);
 
     return (
-        <main className="page-shell relative min-h-screen overflow-hidden px-4 py-10">
-            <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col items-center justify-center gap-6 text-center">
+        <main className="page-shell min-h-screen-safe relative flex overflow-hidden px-4 py-6">
+            <div className="m-auto flex w-full max-w-2xl flex-col items-center justify-center gap-6 text-center">
                 {error && <p className="alert-error w-full rounded-lg p-2 text-sm">{error}</p>}
 
                 {isWaiting && (

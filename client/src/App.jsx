@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import AdminView from "./components/AdminView";
 import ConfirmModal from "./components/ConfirmModal";
 import ExpoShell from "./components/ExpoShell";
+import GoodRankingView from "./components/GoodRankingView";
 import PlayerView from "./components/PlayerView";
 import RankingView from "./components/RankingView";
 
@@ -132,6 +133,7 @@ export default function App() {
     const heartbeatTimeoutRef = useRef(null);
     const adminKeyRef = useRef("");
     const pinSendTimeoutRef = useRef(null);
+    const rejoinAttemptsRef = useRef(0);
 
     useEffect(() => {
         joinedRef.current = joined;
@@ -353,9 +355,23 @@ export default function App() {
                         setStored(STORAGE_KEYS.gameId, incomingGameId);
                     }
 
+                    // 参加中なのに player が無い state を受けた場合：
+                    // サーバーは新規接続の瞬間に必ず「playerなしのstate」を送るため、
+                    // 再接続直後（join応答が届く前）にここへ来ることがある。
+                    // 即座に参加画面へ戻すのではなく、保存済みの名前で自動再joinを試みる。
                     if (!isAdminRef.current && joinedRef.current && !payload.player) {
-                        setJoined(false);
-                        setPin(null);
+                        const clientId = getStored(STORAGE_KEYS.clientId);
+                        const savedName = getStored(STORAGE_KEYS.name);
+                        if (clientId && savedName && rejoinAttemptsRef.current < 5) {
+                            rejoinAttemptsRef.current += 1;
+                            send({ type: "join", role: "participant", name: savedName, clientId });
+                        } else {
+                            setJoined(false);
+                            setPin(null);
+                        }
+                    }
+                    if (payload.player) {
+                        rejoinAttemptsRef.current = 0;
                     }
                     if (payload.phase === "waiting") {
                         setRoundResult([]);
@@ -392,6 +408,7 @@ export default function App() {
 
             if (msg.type === "forceRejoin") {
                 clearStored();
+                rejoinAttemptsRef.current = 0;
                 setJoined(false);
                 setPin(null);
                 setRoundResult([]);
@@ -649,19 +666,26 @@ export default function App() {
                             <p className="mt-3 text-muted">このページは運営のみ閲覧できます。</p>
                         </section>
                     </main>
-                ) : mode !== "geo" ? (
-                    <main className="page-shell min-h-screen p-4 md:p-10">
-                        <section className="glass-card doc-card mx-auto mt-14 max-w-xl p-8">
-                            <h1 className="heading-chip mt-2 text-2xl font-extrabold text-primary">ランキング</h1>
-                            <p className="mt-3 text-muted">ジオゲッサー企画でのみ表示されます。</p>
-                        </section>
-                    </main>
+                ) : mode === "good" ? (
+                    <GoodRankingView
+                        performers={performers}
+                        stats={stats}
+                        currentIndex={currentIndex}
+                        phase={phase}
+                        audienceCount={gameState.audienceCount || 0}
+                        socketReady={socketReady}
+                    />
                 ) : (
                     <RankingView
                         ranking={gameState.ranking || []}
                         scoreMode={gameState.scoreMode || "separate"}
                         currentCategory={gameState.currentCategory || gameState.currentQuestion?.category || "trial"}
                         socketReady={socketReady}
+                        phase={gameState.phase}
+                        currentQuestionIndex={gameState.currentQuestionIndex}
+                        revealedAnswer={gameState.revealedAnswer}
+                        allPins={gameState.allPins || []}
+                        finalRankingVisible={Boolean(gameState.finalRankingVisible)}
                     />
                 )}
             </ExpoShell>
@@ -724,6 +748,14 @@ export default function App() {
                     onClose={() => confirmAndSend("回答を締切ります。よろしいですか？", { type: "admin:close" })}
                     onReset={() => confirmAndSend("進行を完全にリセットします。参加者は再参加が必要です。続行しますか？", { type: "admin:reset" })}
                     onResetGood={() => confirmAndSend("ゴッドタレントの進行を完全にリセットします。続行しますか？", { type: "admin:resetGood" })}
+                    onShowFinal={() =>
+                        confirmAndSend(
+                            "総合ランキングを表示します。よろしいですか？",
+                            { type: "admin:showFinalRanking" },
+                            "表示する",
+                            "やめる"
+                        )
+                    }
                     formatDistance={formatDistance}
                 />
                 <ConfirmModal

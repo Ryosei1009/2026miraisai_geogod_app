@@ -63,9 +63,11 @@ const logger = winston.createLogger({
 
 const app = express();
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "";
-const corsOptions = CLIENT_ORIGIN
-  ? { origin: CLIENT_ORIGIN, credentials: true }
-  : { origin: true };
+const corsOptions = process.env.IS_DEBUG
+  ? { origin: true }
+  : CLIENT_ORIGIN
+    ? { origin: CLIENT_ORIGIN, credentials: true }
+    : { origin: true };
 
 const ADMIN_KEY = String(process.env.ADMIN_KEY || "").trim();
 
@@ -136,7 +138,9 @@ let currentMode = "geo";
 
 const geoState = {
   phase: "waiting",
-  currentQuestionIndex: 0
+  currentQuestionIndex: 0,
+  // 全問終了後、運営が「総合ランキングを表示する」を押すと true になる
+  finalRankingVisible: false
 };
 
 const goodState = {
@@ -217,6 +221,18 @@ function buildRanking() {
     .sort((a, b) => b.totalScore - a.totalScore);
 }
 
+// 締切後の結果マップ用：現在の問題に対する全参加者の回答ピン
+// （finished = 最終問題の締切後なので、closed と同様にピンを出す）
+function buildCurrentPins() {
+  if (geoState.phase !== "closed" && geoState.phase !== "finished") return [];
+  return getAllParticipants()
+    .map((p) => {
+      const ans = p.answers[geoState.currentQuestionIndex];
+      return ans ? { name: p.name, lat: ans.lat, lng: ans.lng } : null;
+    })
+    .filter(Boolean);
+}
+
 function buildGeoBase() {
   const currentQuestion = questions[geoState.currentQuestionIndex];
   return {
@@ -238,7 +254,8 @@ function buildGeoBase() {
     currentCategory: currentQuestion?.category || null,
     scoreMode: SCORE_MODE,
     gameId,
-    revealedAnswer: geoState.phase === "closed" && currentQuestion
+    finalRankingVisible: geoState.finalRankingVisible,
+    revealedAnswer: (geoState.phase === "closed" || geoState.phase === "finished") && currentQuestion
       ? currentQuestion.answer
       : null
   };
@@ -254,8 +271,10 @@ function buildGeoStateFor(meta, cache = {}) {
   if (meta?.role === "admin") {
     if (!cache.leaderboard) cache.leaderboard = buildLeaderboard();
     if (!cache.ranking) cache.ranking = buildRanking();
+    if (!cache.allPins) cache.allPins = buildCurrentPins();
     state.leaderboard = cache.leaderboard;
     state.ranking = cache.ranking;
+    state.allPins = cache.allPins;
   }
 
   if (meta?.role === "participant") {
@@ -304,11 +323,16 @@ function buildStatsSummary() {
   return performerStats.map((stat, index) => {
     const isCurrent = goodState.phase === "live" && index === goodState.currentIndex;
     const goodCount = isCurrent && !stat.locked ? stat.voters.size : stat.goodCount;
-    let participantCount = isCurrent && !stat.locked ? liveAudience : stat.participantCount;
     // 投票中は最大接続者数を更新
     if (isCurrent && !stat.locked) {
       stat.maxParticipantCount = Math.max(stat.maxParticipantCount, liveAudience);
     }
+    // 分母は投票期間中の最大接続者数（high-water mark）。
+    // ライブ接続数をそのまま使うと、投票後に退出した人のぶん分母が減って
+    // Good率が100%を超えてしまう。投票者数を下回らないようにも保証する。
+    const participantCount = isCurrent && !stat.locked
+      ? Math.max(stat.maxParticipantCount, goodCount)
+      : Math.max(stat.participantCount, stat.goodCount);
     return {
       id: stat.id,
       no: performers[index]?.no || "",
@@ -536,6 +560,14 @@ function handleAdminGeoMessage(msg) {
     return true;
   }
 
+  // 全問終了後、ランキング画面を「総合（日本+世界）」表示に切り替える
+  if (msg.type === "admin:showFinalRanking") {
+    if (geoState.phase !== "finished") return true;
+    geoState.finalRankingVisible = true;
+    broadcastState();
+    return true;
+  }
+
   return false;
 }
 
@@ -546,6 +578,7 @@ function handleAdminJumpMessage(msg) {
       const clamped = Math.max(0, Math.min(questions.length - 1, nextIndex));
       geoState.currentQuestionIndex = clamped;
       geoState.phase = "active";
+      geoState.finalRankingVisible = false;
       clearCurrentPins();
       broadcastState();
     }
@@ -750,6 +783,7 @@ function broadcastForceRejoin() {
 function resetGeoGame({ forceRejoin = false } = {}) {
   geoState.phase = "waiting";
   geoState.currentQuestionIndex = 0;
+  geoState.finalRankingVisible = false;
   if (forceRejoin) {
     gameId = createGameId();
     participantsById.clear();
@@ -771,8 +805,8 @@ function lockCurrentStats() {
   const stat = performerStats[goodState.currentIndex];
   if (!stat) return;
   stat.goodCount = stat.voters.size;
-  // 投票期間中の最大接続者数を参加者数として固定
-  stat.participantCount = stat.maxParticipantCount;
+  // 投票期間中の最大接続者数を参加者数として固定（投票者数を下回らないよう保証）
+  stat.participantCount = Math.max(stat.maxParticipantCount, stat.goodCount);
   stat.locked = true;
 }
 
@@ -806,6 +840,9 @@ const wss = new WebSocketServer({
   // 正規メッセージは数百バイト以下。巨大フレームによるメモリDoSを防ぐ
   maxPayload: 4 * 1024,
   verifyClient: (info) => {
+    if (process.env.IS_DEBUG) {
+      return true;
+    }
     if (!isOriginAllowed(info.origin)) {
       logger.warn(`WebSocket connection rejected: origin=${info.origin}`);
       return false;

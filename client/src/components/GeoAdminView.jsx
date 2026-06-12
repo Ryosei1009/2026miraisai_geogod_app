@@ -12,6 +12,7 @@ export default function GeoAdminView({
     onNext,
     onReset,
     onJumpGeo,
+    onShowFinal,
     formatDistance
 }) {
     const phaseLabelMap = {
@@ -113,6 +114,14 @@ export default function GeoAdminView({
                         <div className="bg-card-soft mt-5 rounded-xl p-4 text-primary">
                             <p className="text-sm text-muted">最終結果</p>
                             <p className="text-xl font-bold">全問終了です。お疲れさまでした。</p>
+                            {!gameState.finalRankingVisible && (
+                                <button
+                                    className="btn-main mt-4 w-full rounded-xl px-4 py-3 font-bold"
+                                    onClick={onShowFinal}
+                                >
+                                    総合ランキングを表示
+                                </button>
+                            )}
                         </div>
                     )}
 
