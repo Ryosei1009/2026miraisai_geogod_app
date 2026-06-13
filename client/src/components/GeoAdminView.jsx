@@ -13,6 +13,8 @@ export default function GeoAdminView({
     onReset,
     onJumpGeo,
     onShowFinal,
+    onRevealNext,
+    onRevealPrev,
     formatDistance
 }) {
     const phaseLabelMap = {
@@ -34,6 +36,13 @@ export default function GeoAdminView({
 
     const primaryBtn = "btn-main w-full rounded-xl px-4 py-3 font-bold";
     const secondaryBtn = "btn-outline w-full rounded-xl px-4 py-3 font-bold disabled:opacity-40";
+
+    // ランキング段階発表（3位→2位→1位）の状態。announcement が立っている場面でのみ操作。
+    const announcement = gameState.announcement || null;
+    const revealStep = gameState.revealStep || 0;
+    const announceTitleMap = { japan: "日本ランキング発表", world: "世界ランキング発表", combined: "総合ランキング発表" };
+    const revealNextLabel = ["3位を発表", "2位を発表", "1位を発表"][revealStep] || "発表完了";
+    const revealStatusLabel = ["まだ非表示", "3位まで公開", "2位まで公開", "1位まで公開（完了）"][revealStep] || "";
 
     return (
         <main className="page-shell min-h-screen p-3 pt-6 md:p-6 md:pt-8">
@@ -95,6 +104,28 @@ export default function GeoAdminView({
                     </div>
 
                     {error && <p className="alert-error mt-4 rounded-lg p-2 text-sm">{error}</p>}
+
+                    {announcement && (
+                        <div className="mt-5 rounded-xl border-2 border-theme bg-card-soft p-4">
+                            <p className="heading-chip text-xs font-bold uppercase tracking-[0.18em] text-subtle">ANNOUNCEMENT</p>
+                            <h3 className="mt-1 text-xl font-black text-primary">{announceTitleMap[announcement]}</h3>
+                            <p className="mt-1 text-sm text-muted">投影画面: {revealStatusLabel}</p>
+                            <button
+                                className="btn-main mt-3 w-full rounded-xl px-4 py-3 text-lg font-bold disabled:opacity-40"
+                                onClick={onRevealNext}
+                                disabled={revealStep >= 3}
+                            >
+                                {revealNextLabel}
+                            </button>
+                            <button
+                                className="btn-outline mt-2 w-full rounded-xl px-4 py-2 text-sm font-bold disabled:opacity-40"
+                                onClick={onRevealPrev}
+                                disabled={revealStep <= 0}
+                            >
+                                1つ戻す
+                            </button>
+                        </div>
+                    )}
 
                     <div className="mt-5">
                         <h3 className="heading-chip text-xl font-bold text-primary">ランキング</h3>

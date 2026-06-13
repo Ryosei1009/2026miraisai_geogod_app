@@ -686,6 +686,8 @@ export default function App() {
                         revealedAnswer={gameState.revealedAnswer}
                         allPins={gameState.allPins || []}
                         finalRankingVisible={Boolean(gameState.finalRankingVisible)}
+                        announcement={gameState.announcement || null}
+                        revealStep={gameState.revealStep || 0}
                     />
                 )}
             </ExpoShell>
@@ -756,6 +758,8 @@ export default function App() {
                             "やめる"
                         )
                     }
+                    onRevealNext={() => send({ type: "admin:revealNext" })}
+                    onRevealPrev={() => send({ type: "admin:revealPrev" })}
                     formatDistance={formatDistance}
                 />
                 <ConfirmModal
