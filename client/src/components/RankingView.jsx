@@ -224,42 +224,6 @@ export default function RankingView({
                     </div>
                 </div>
 
-                {hasResultMap && (
-                <div className="mt-4 overflow-hidden rounded-2xl border-2 border-theme bg-card">
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-theme px-5 py-2">
-                        <p className="heading-chip text-lg font-bold text-primary">
-                            結果マップ
-                            {(phase === "closed" || phase === "finished") && Number.isFinite(currentQuestionIndex)
-                                ? `　第${currentQuestionIndex + 1}問`
-                                : ""}
-                        </p>
-                        {(phase === "closed" || phase === "finished") ? (
-                            <div className="flex items-center gap-5 text-base font-bold">
-                                <span className="flex items-center gap-2 text-primary">
-                                    <span className="h-4 w-4 rounded-full border-2 border-white bg-[var(--expo-blue)]" aria-hidden="true" />
-                                    参加者の回答（{allPins.length}人）
-                                </span>
-                                <span className="flex items-center gap-2 text-primary">
-                                    <span className="h-4 w-4 rounded-full bg-[var(--expo-red)]" aria-hidden="true" />
-                                    正解
-                                </span>
-                            </div>
-                        ) : (
-                            <p className="text-base text-muted">回答締め切り後に全員のピンが表示されます</p>
-                        )}
-                    </div>
-                    <div className="h-[38vh] w-full">
-                        <ResultMap
-                            phase={phase}
-                            currentQuestionIndex={currentQuestionIndex}
-                            currentCategory={categoryKey}
-                            revealedAnswer={revealedAnswer}
-                            allPins={allPins}
-                        />
-                    </div>
-                </div>
-                )}
-
                 {ranking.length === 0 ? (
                     <p className="mt-12 text-4xl text-muted">現在のランキングはありません。</p>
                 ) : (
@@ -312,6 +276,20 @@ export default function RankingView({
                             );
                         })}
                     </div>
+                )}
+
+                {hasResultMap && (
+                <div className="mt-4 overflow-hidden rounded-2xl border-2 border-theme bg-card">
+                    <div className="h-[38vh] w-full">
+                        <ResultMap
+                            phase={phase}
+                            currentQuestionIndex={currentQuestionIndex}
+                            currentCategory={categoryKey}
+                            revealedAnswer={revealedAnswer}
+                            allPins={allPins}
+                        />
+                    </div>
+                </div>
                 )}
             </div>
         </main>
