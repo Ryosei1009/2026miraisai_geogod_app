@@ -59,6 +59,11 @@ const categoryFromIndex = (index) => {
 
 function formatDistance(v) {
     if (typeof v !== "number") return "-";
+    // 1km未満はメートル表示（10m単位に丸める）。丸めて1000mに達したらkm表記に戻す
+    if (v < 1) {
+        const meters = Math.round(v * 1000 / 10) * 10;
+        if (meters < 1000) return `${meters} m`;
+    }
     return `${v.toFixed(1)} km`;
 }
 
@@ -782,6 +787,7 @@ export default function App() {
                     gameState.currentQuestion?.category ||
                     categoryFromIndex(gameState.currentQuestionIndex)
                 }
+                currentQuestionIndex={gameState.currentQuestionIndex}
                 playerAnswer={player?.currentAnswer || null}
                 pin={pin}
                 onPick={handlePick}

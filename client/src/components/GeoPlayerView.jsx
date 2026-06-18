@@ -1,8 +1,16 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { GoogleMap, MarkerF, useJsApiLoader } from "@react-google-maps/api";
 
 const JAPAN_CENTER = { lat: 36, lng: 138 };
 const JAPAN_ZOOM = 5;
+const WORLD_CENTER = { lat: 20, lng: 140 };
+const WORLD_ZOOM = 2;
+
+// カテゴリごとの初期表示（問題が切り替わるたびにここへ戻す）
+const defaultViewForCategory = (category) =>
+    category === "world"
+        ? { center: WORLD_CENTER, zoom: WORLD_ZOOM }
+        : { center: JAPAN_CENTER, zoom: JAPAN_ZOOM };
 
 const mapOptions = {
     clickableIcons: false,
@@ -18,7 +26,8 @@ const mapOptions = {
     ]
 };
 
-export default function GeoPlayerView({ phase, player, currentCategory, playerAnswer, pin, onPick, canAnswer, revealedAnswer, error, formatDistance }) {
+export default function GeoPlayerView({ phase, player, currentCategory, currentQuestionIndex, playerAnswer, pin, onPick, canAnswer, revealedAnswer, error, formatDistance }) {
+    const mapRef = useRef(null);
     const scoreBucket = player?.scores || { trial: 0, japan: 0, world: 0 };
     const scoreLabels = { trial: "お試し", japan: "日本", world: "世界" };
     const activeKey = player?.currentCategory || currentCategory || "trial";
@@ -45,6 +54,16 @@ export default function GeoPlayerView({ phase, player, currentCategory, playerAn
             strokeWeight: 2
         };
     }, [isLoaded]);
+
+    const activeCategory = player?.currentCategory || currentCategory || "trial";
+
+    // 別の問題（マップ）に進んだら、ユーザーが拡大・移動していても初期表示に戻す
+    useEffect(() => {
+        if (!mapRef.current) return;
+        const { center, zoom } = defaultViewForCategory(activeCategory);
+        mapRef.current.setZoom(zoom);
+        mapRef.current.panTo(center);
+    }, [currentQuestionIndex, activeCategory]);
 
     const handleMapClick = (event) => {
         if (!canAnswer) return;
@@ -75,6 +94,12 @@ export default function GeoPlayerView({ phase, player, currentCategory, playerAn
                         mapContainerClassName="h-full w-full"
                         options={mapOptions}
                         onClick={handleMapClick}
+                        onLoad={(map) => {
+                            mapRef.current = map;
+                        }}
+                        onUnmount={() => {
+                            mapRef.current = null;
+                        }}
                     >
                         {pin && <MarkerF position={pin} />}
                         {phase === "closed" && revealedAnswer && <MarkerF position={revealedAnswer} icon={correctPinIcon} />}
