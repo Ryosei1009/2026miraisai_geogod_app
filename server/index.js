@@ -125,6 +125,9 @@ const questions = [
   { id: 11, title: "世界5: シドニー・オペラハウス", answer: { lat: -33.85678, lng: 151.2153 }, category: "world" }
 ];
 
+// 日本カテゴリの最終問題インデックス。締切後にこの問題なら「日本ランキング発表」へ入る
+const LAST_JAPAN_INDEX = questions.reduce((acc, q, i) => (q.category === "japan" ? i : acc), -1);
+
 const performers = [
   { id: 1, no: "No.1", name: "グループA" },
   { id: 2, no: "No.2", name: "グループB" },
@@ -140,7 +143,9 @@ const geoState = {
   phase: "waiting",
   currentQuestionIndex: 0,
   // 全問終了後、運営が「総合ランキングを表示する」を押すと true になる
-  finalRankingVisible: false
+  finalRankingVisible: false,
+  // ランキング発表（3位→2位→1位）の公開済み件数。0=非表示, 3=全公開
+  revealStep: 0
 };
 
 const goodState = {
@@ -233,6 +238,18 @@ function buildCurrentPins() {
     .filter(Boolean);
 }
 
+// 現在「段階発表（3位→2位→1位）」を行う場面かどうかを判定する。
+// japan   = 日本全問終了後（日本最終問題の締切後）
+// world   = 世界全問終了後（全問終了 = finished）かつ総合表示前
+// combined= 運営が「総合ランキングを表示」を押した後
+// null    = 通常の各問題の結果（マップ＋上位3名をそのまま表示）
+function currentAnnouncement() {
+  if (geoState.finalRankingVisible) return "combined";
+  if (geoState.phase === "finished") return "world";
+  if (geoState.phase === "closed" && geoState.currentQuestionIndex === LAST_JAPAN_INDEX) return "japan";
+  return null;
+}
+
 function buildGeoBase() {
   const currentQuestion = questions[geoState.currentQuestionIndex];
   return {
@@ -255,6 +272,9 @@ function buildGeoBase() {
     scoreMode: SCORE_MODE,
     gameId,
     finalRankingVisible: geoState.finalRankingVisible,
+    // ランキング発表の場面と、公開済み順位数（クライアントが段階表示に使う）
+    announcement: currentAnnouncement(),
+    revealStep: geoState.revealStep,
     revealedAnswer: (geoState.phase === "closed" || geoState.phase === "finished") && currentQuestion
       ? currentQuestion.answer
       : null
@@ -539,6 +559,8 @@ function handleAdminGeoMessage(msg) {
 
     const isLast = geoState.currentQuestionIndex >= questions.length - 1;
     geoState.phase = isLast ? "finished" : "closed";
+    // 発表場面に入る場合は必ず非表示（revealStep=0）から始める
+    geoState.revealStep = 0;
 
     // roundResult はクライアント側で AdminView のみが使用するため管理者にのみ送る
     for (const [clientWs, clientMeta] of clients.entries()) {
@@ -555,6 +577,7 @@ function handleAdminGeoMessage(msg) {
     if (geoState.currentQuestionIndex >= questions.length - 1) return true;
     geoState.currentQuestionIndex += 1;
     geoState.phase = "active";
+    geoState.revealStep = 0;
     clearCurrentPins();
     broadcastState();
     return true;
@@ -564,6 +587,22 @@ function handleAdminGeoMessage(msg) {
   if (msg.type === "admin:showFinalRanking") {
     if (geoState.phase !== "finished") return true;
     geoState.finalRankingVisible = true;
+    // 総合ランキングも非表示から段階発表する
+    geoState.revealStep = 0;
+    broadcastState();
+    return true;
+  }
+
+  // ランキング発表を1つ進める / 戻す（3位→2位→1位）。発表場面のときのみ有効
+  if (msg.type === "admin:revealNext") {
+    if (!currentAnnouncement()) return true;
+    if (geoState.revealStep < 3) geoState.revealStep += 1;
+    broadcastState();
+    return true;
+  }
+
+  if (msg.type === "admin:revealPrev") {
+    if (geoState.revealStep > 0) geoState.revealStep -= 1;
     broadcastState();
     return true;
   }
@@ -579,6 +618,7 @@ function handleAdminJumpMessage(msg) {
       geoState.currentQuestionIndex = clamped;
       geoState.phase = "active";
       geoState.finalRankingVisible = false;
+      geoState.revealStep = 0;
       clearCurrentPins();
       broadcastState();
     }
@@ -784,6 +824,7 @@ function resetGeoGame({ forceRejoin = false } = {}) {
   geoState.phase = "waiting";
   geoState.currentQuestionIndex = 0;
   geoState.finalRankingVisible = false;
+  geoState.revealStep = 0;
   if (forceRejoin) {
     gameId = createGameId();
     participantsById.clear();
