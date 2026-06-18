@@ -677,6 +677,7 @@ export default function App() {
                         stats={stats}
                         currentIndex={currentIndex}
                         phase={phase}
+                        revealStep={gameState.revealStep || 0}
                         audienceCount={gameState.audienceCount || 0}
                         socketReady={socketReady}
                     />
@@ -765,6 +766,14 @@ export default function App() {
                     }
                     onRevealNext={() => send({ type: "admin:revealNext" })}
                     onRevealPrev={() => send({ type: "admin:revealPrev" })}
+                    onFinishGood={() =>
+                        confirmAndSend(
+                            "ランキング発表を終了して待機に戻りますか？",
+                            { type: "admin:finishGood" },
+                            "終了する",
+                            "やめる"
+                        )
+                    }
                     formatDistance={formatDistance}
                 />
                 <ConfirmModal

@@ -16,6 +16,7 @@ export default function GoodPlayerView({
     const isWaiting = phase === "waiting";
     const isLive = phase === "live";
     const isReview = phase === "review";
+    const isRanking = phase === "ranking";
     const goodDisabled = !canGood || (isLive && hasVotedCurrent);
     const [isPulsing, setIsPulsing] = useState(false);
 
@@ -68,6 +69,14 @@ export default function GoodPlayerView({
                     <div className="glass-card doc-card w-full max-w-md p-6 text-center">
                         <h2 className="text-2xl font-extrabold text-primary">締め切り</h2>
                         <p className="mt-2 text-sm text-muted">集計中です。次の出演者までお待ちください。</p>
+                    </div>
+                )}
+
+                {isRanking && (
+                    <div className="glass-card doc-card w-full max-w-md p-8 text-center">
+                        <p className="heading-chip justify-center text-xs font-bold uppercase tracking-[0.18em] text-subtle">RESULT</p>
+                        <h2 className="mt-3 text-2xl font-black text-primary sm:text-3xl">ランキング発表中</h2>
+                        <p className="mt-2 text-sm text-muted">スクリーンをご覧ください。</p>
                     </div>
                 )}
 

@@ -54,6 +54,7 @@ export default function GoodAdminView({
     mode,
     onSwitchMode,
     phase,
+    gameState,
     performers,
     currentIndex,
     stats,
@@ -63,14 +64,30 @@ export default function GoodAdminView({
     onBack,
     onNext,
     onJumpGood,
-    onResetGood
+    onResetGood,
+    onRevealNext,
+    onRevealPrev,
+    onFinishGood
 }) {
     const phaseLabelMap = {
         waiting: "待機中",
         live: "本番中",
-        review: "締め切り後"
+        review: "締め切り後",
+        ranking: "ランキング発表"
     };
     const phaseLabel = phaseLabelMap[phase] || "待機中";
+
+    // ランキング発表の段階ラベル（5位→4位→3位→2位・1位→全表示）
+    const n = performers.length;
+    const revealStep = gameState?.revealStep || 0;
+    const revealNextLabel =
+        revealStep >= n
+            ? "発表完了"
+            : revealStep === n - 1
+                ? "全順位を表示"
+                : revealStep === n - 2
+                    ? "2位・1位を発表"
+                    : `${n - revealStep}位を発表`;
 
     const currentPerformer = performers[currentIndex] || null;
     const currentStat = stats[currentIndex] || null;
@@ -166,7 +183,41 @@ export default function GoodAdminView({
                                     className="btn-main rounded-xl px-4 py-3 font-bold"
                                     onClick={onNext}
                                 >
-                                    {currentIndex >= performers.length - 1 ? "待機へ" : "次の出演者"}
+                                    {currentIndex >= performers.length - 1 ? "ランキング発表へ" : "次の出演者"}
+                                </button>
+                            </div>
+                        )}
+
+                        {phase === "ranking" && (
+                            <div className="space-y-2">
+                                <p className="num text-sm text-muted">発表ステップ: {revealStep} / {n}</p>
+                                <button
+                                    className="btn-main w-full rounded-xl px-4 py-3 font-bold disabled:opacity-40"
+                                    onClick={onRevealNext}
+                                    disabled={revealStep >= n}
+                                >
+                                    {revealNextLabel}
+                                </button>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        className="btn-outline rounded-xl px-4 py-3 font-bold disabled:opacity-40"
+                                        onClick={onRevealPrev}
+                                        disabled={revealStep <= 0}
+                                    >
+                                        1つ戻す
+                                    </button>
+                                    <button
+                                        className="btn-outline rounded-xl px-4 py-3 font-bold"
+                                        onClick={onBack}
+                                    >
+                                        締切後へ戻る
+                                    </button>
+                                </div>
+                                <button
+                                    className="btn-dark w-full rounded-xl px-4 py-3 font-bold"
+                                    onClick={onFinishGood}
+                                >
+                                    発表終了・待機へ
                                 </button>
                             </div>
                         )}

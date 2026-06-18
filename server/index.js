@@ -133,8 +133,7 @@ const performers = [
   { id: 2, no: "No.2", name: "グループB" },
   { id: 3, no: "No.3", name: "グループC" },
   { id: 4, no: "No.4", name: "グループD" },
-  { id: 5, no: "No.5", name: "グループE" },
-  { id: 6, no: "No.6", name: "グループF" }
+  { id: 5, no: "No.5", name: "篠原 諒成" }
 ];
 
 let currentMode = "geo";
@@ -150,7 +149,10 @@ const geoState = {
 
 const goodState = {
   phase: "waiting",
-  currentIndex: -1
+  currentIndex: -1,
+  // ランキング発表（最終出演者の締切後）の公開済みステップ。
+  // 0=非表示。5位→4位→3位→(2位,1位)→全表示 の順に進む（出演者数=最大ステップ）
+  revealStep: 0
 };
 
 const clients = new Map();
@@ -328,6 +330,7 @@ function resetGoodGame() {
   resetStats();
   goodState.phase = "waiting";
   goodState.currentIndex = -1;
+  goodState.revealStep = 0;
 }
 
 function goodAudienceCount() {
@@ -388,6 +391,7 @@ function buildGoodStateFor(meta, cache = {}) {
     performers,
     stats: cache.goodStats,
     audienceCount: cache.goodAudience,
+    revealStep: goodState.revealStep,
     hasVotedCurrent: hasVotedCurrent(meta)
   };
 }
@@ -679,8 +683,9 @@ function handleAdminGoodMessage(msg) {
     if (goodState.phase === "review") {
       const isLast = goodState.currentIndex >= performers.length - 1;
       if (isLast) {
-        goodState.phase = "waiting";
-        goodState.currentIndex = -1;
+        // 最終出演者の締切後は、待機ではなくランキング発表へ移る
+        goodState.phase = "ranking";
+        goodState.revealStep = 0;
       } else {
         goodState.currentIndex += 1;
         goodState.phase = "live";
@@ -699,7 +704,42 @@ function handleAdminGoodMessage(msg) {
     return true;
   }
 
+  // ランキング発表を1つ進める / 戻す（5位→4位→3位→(2位,1位)→全表示）
+  if (msg.type === "admin:revealNext") {
+    if (goodState.phase !== "ranking") return true;
+    const maxStep = performers.length; // = 全表示（recap）
+    if (goodState.revealStep < maxStep) goodState.revealStep += 1;
+    broadcastState();
+    return true;
+  }
+
+  if (msg.type === "admin:revealPrev") {
+    if (goodState.phase !== "ranking") return true;
+    if (goodState.revealStep > 0) goodState.revealStep -= 1;
+    broadcastState();
+    return true;
+  }
+
+  // ランキング発表を終了して待機に戻る
+  if (msg.type === "admin:finishGood") {
+    if (goodState.phase !== "ranking") return true;
+    goodState.phase = "waiting";
+    goodState.currentIndex = -1;
+    goodState.revealStep = 0;
+    broadcastState();
+    return true;
+  }
+
   if (msg.type === "admin:back") {
+    // 発表場面から最終出演者の締切後画面へ戻す
+    if (goodState.phase === "ranking") {
+      goodState.phase = "review";
+      goodState.currentIndex = performers.length - 1;
+      goodState.revealStep = 0;
+      broadcastState();
+      return true;
+    }
+
     if (goodState.phase === "review") {
       goodState.phase = "live";
       const stat = performerStats[goodState.currentIndex];

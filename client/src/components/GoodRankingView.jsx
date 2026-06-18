@@ -1,13 +1,7 @@
 // ゴッドタレントのスクリーン投影用ビュー（?rank=1・運営のみ、ジオのランキング画面と同じ導線）。
 // ・本番中: 現在の出演者と「投票受付中」を表示（票数は集計バイアスを避けるため見せない）
 // ・締め切り後: その出演者の票数とGood率を大きく表示
-// ・全出演者の採点が終わって待機に戻ったタイミングで最終ランキングへ自動で切り替わる
-const PODIUM = [
-    { color: "var(--expo-red)", label: "1st" },
-    { color: "var(--expo-blue)", label: "2nd" },
-    { color: "var(--expo-yellow)", label: "3rd" }
-];
-
+// ・最終出演者の締切後（phase="ranking"）: 5位→4位→3位→2位・1位→全表示 と段階発表
 const rateOf = (stat) =>
     stat && stat.participantCount > 0 ? (stat.goodCount / stat.participantCount) * 100 : 0;
 
@@ -34,83 +28,80 @@ function Header({ title, socketReady, badge }) {
     );
 }
 
-export default function GoodRankingView({ performers, stats, currentIndex, phase, audienceCount, socketReady }) {
+// 順位の色：1位=赤 / 2位=青 / 3位=黄 / それ以下=黒
+const rankColor = (p) =>
+    p === 1 ? "var(--expo-red)" : p === 2 ? "var(--expo-blue)" : p === 3 ? "var(--expo-yellow)" : "var(--expo-black)";
+
+export default function GoodRankingView({ performers, stats, currentIndex, phase, revealStep = 0, audienceCount, socketReady }) {
     const currentPerformer = performers[currentIndex] || null;
     const currentStat = stats[currentIndex] || null;
-    const allLocked =
-        performers.length > 0 && performers.every((_, index) => stats[index]?.locked);
-    const showFinal = allLocked && phase === "waiting";
 
-    // 最終ランキング：Good率の高い順（同率は票数で比較）
+    // 最終ランキング：Good率の高い順（同率は票数で比較）。index0=1位
     const finalRanking = performers
         .map((performer, index) => {
             const stat = stats[index];
             return { performer, goodCount: stat?.goodCount ?? 0, rate: rateOf(stat) };
         })
         .sort((a, b) => b.rate - a.rate || b.goodCount - a.goodCount);
-    const podiumOrder = [1, 0, 2];
-    const topThree = finalRanking.slice(0, 3);
-    const rest = finalRanking.slice(3);
 
-    if (showFinal) {
+    // ランキング発表フェーズ：5位→4位→3位→(2位,1位)→全表示 の段階公開。
+    // 順位 p (1=1位..n=最下位) の公開ステップ：下位から1ずつ、最後に上位2名を同時公開。
+    if (phase === "ranking") {
+        const n = finalRanking.length;
+        const revealStepForRank = (p) => (p <= 2 ? n - 1 : n - p + 1);
+        const isRevealed = (p) => revealStep >= revealStepForRank(p);
+        const isRecap = revealStep >= n;
+
         return (
-            <main className="page-shell min-h-screen p-4 pt-6 md:p-8 md:pt-20">
-                <div className="mx-auto max-w-[1500px]">
-                    <Header title="最終ランキング" socketReady={socketReady} badge="Good率" />
+            <main className="page-shell min-h-screen p-4 pt-6 md:p-8 md:pt-16">
+                <div className="mx-auto max-w-[1200px]">
+                    <Header
+                        title={isRecap ? "最終結果" : "ランキング発表"}
+                        socketReady={socketReady}
+                        badge="Good率"
+                    />
 
-                    <div className="mt-6 grid items-end gap-4 md:grid-cols-3">
-                        {podiumOrder.map((rankIndex) => {
-                            const row = topThree[rankIndex];
-                            if (!row) return null;
-                            const podium = PODIUM[rankIndex];
+                    <div className="mt-6 space-y-3">
+                        {finalRanking.map((row, index) => {
+                            const p = index + 1;
+                            const revealed = isRevealed(p);
+                            const isNew = !isRecap && revealStepForRank(p) === revealStep;
+                            const color = rankColor(p);
                             return (
                                 <div
                                     key={row.performer.id}
-                                    className={`bg-card rounded-2xl border-2 border-theme p-4 md:px-6 ${
-                                        rankIndex === 0 ? "md:pb-10" : rankIndex === 1 ? "md:pb-6" : "md:pb-4"
-                                    }`}
-                                    style={{ borderTop: `10px solid ${podium.color}` }}
+                                    className={`bg-card rounded-2xl border-2 px-5 py-4 transition md:px-8 ${isNew ? "shadow-xl" : ""}`}
+                                    style={{
+                                        borderColor: revealed ? color : "var(--border-color)",
+                                        borderLeftWidth: "12px",
+                                        borderLeftColor: revealed ? color : "var(--border-color)"
+                                    }}
                                 >
-                                    <div className="flex min-w-0 items-baseline gap-3">
-                                        <span className="num text-3xl font-black md:text-4xl" style={{ color: podium.color }}>
-                                            {rankIndex + 1}
-                                        </span>
-                                        <span className="truncate text-2xl font-black text-primary md:text-3xl">
-                                            {row.performer.name}
-                                        </span>
-                                    </div>
-                                    <p className="num mt-1 text-5xl font-black text-primary md:text-6xl">
-                                        {row.rate.toFixed(1)}
-                                        <span className="ml-2 text-xl font-bold text-subtle">%</span>
-                                    </p>
-                                    <p className="num mt-1 text-lg font-bold text-muted">Good {row.goodCount}票</p>
+                                    {revealed ? (
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div className="flex min-w-0 items-baseline gap-4">
+                                                <span className="num text-4xl font-black md:text-6xl" style={{ color }}>
+                                                    {p}
+                                                </span>
+                                                <span className="truncate text-3xl font-black text-primary md:text-5xl">
+                                                    {row.performer.name}
+                                                </span>
+                                            </div>
+                                            <span className="num flex-none text-4xl font-black text-primary md:text-6xl">
+                                                {row.rate.toFixed(1)}
+                                                <span className="ml-1 text-xl font-bold text-subtle md:text-2xl">%</span>
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center justify-between gap-4 text-subtle">
+                                            <span className="num text-4xl font-black md:text-6xl">第{p}位</span>
+                                            <span className="text-3xl font-black md:text-4xl">？</span>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
                     </div>
-
-                    {rest.length > 0 && (
-                        <ol className="mt-4 grid gap-x-12 md:grid-cols-2">
-                            {rest.map((row, index) => (
-                                <li key={row.performer.id} className="border-b-2 border-theme px-2 py-2">
-                                    <div className="flex items-baseline justify-between gap-4">
-                                        <div className="flex min-w-0 items-baseline gap-4">
-                                            <span className="num w-10 flex-none text-right text-xl font-bold text-subtle md:text-2xl">
-                                                {index + 4}
-                                            </span>
-                                            <span className="truncate text-xl font-bold text-primary md:text-2xl">
-                                                {row.performer.name}
-                                            </span>
-                                        </div>
-                                        <span className="num flex-none text-2xl font-black text-primary md:text-3xl">
-                                            {row.rate.toFixed(1)}
-                                            <span className="ml-1 text-base font-bold text-subtle">%</span>
-                                        </span>
-                                    </div>
-                                </li>
-                            ))}
-                        </ol>
-                    )}
                 </div>
             </main>
         );
