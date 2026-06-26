@@ -766,7 +766,14 @@ export default function App() {
                             "やめる"
                         )
                     }
-                    onRevealAnswer={() => send({ type: "admin:revealAnswer" })}
+                    onRevealAnswer={() =>
+                        confirmAndSend(
+                            "答えを表示します。よろしいですか？",
+                            { type: "admin:revealAnswer" },
+                            "表示する",
+                            "やめる"
+                        )
+                    }
                     onShowRanking={() =>
                         confirmAndSend(
                             "ランキング発表に進みます。よろしいですか？",

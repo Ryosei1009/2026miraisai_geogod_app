@@ -196,26 +196,18 @@ function haversineKm(lat1, lng1, lat2, lng2) {
   return R * c;
 }
 
-// 日本・お試し：半径 JP_FULL_KM 以内は満点(5000)。それより遠いと指数関数で減衰し、
-// ちょうど 10km で約1000点になるよう係数 JP_DECAY_K を調整している（崖をなくし滑らかに0へ）。
-//   5000 * exp(-(10 - 0.05) / K) = 1000  →  K = (10 - 0.05) / ln(5)
-const JP_FULL_KM = 0.05; // 50m 以内は満点
-const JP_DECAY_K = (10 - JP_FULL_KM) / Math.log(5); // ≒ 6.182
+// 得点：S = 5000 × e^(−10·d/D)（d=誤差km）。d=0で5000点、距離に対し指数的に減衰する。
+// スケール D はマップごとに変える（小さいほど早く減衰）。
+const JP_SCALE_D = 2300; // 日本・お試し（km）
+const WORLD_SCALE_D = 22465; // 世界（km）
 
 function scoreFromDistance(distanceKm, category) {
-  if (category === "world") {
-    // 世界は従来どおり（150m/点の線形）
-    const distanceMeters = distanceKm * 1000;
-    return Math.max(0, Math.round(5000 - distanceMeters / 150));
-  }
-  // 日本・お試し：50m以内=満点、以降は指数減衰（10kmで約1000点、約55kmで実質0点）
-  if (distanceKm <= JP_FULL_KM) return 5000;
-  return Math.max(0, Math.round(5000 * Math.exp(-(distanceKm - JP_FULL_KM) / JP_DECAY_K)));
+  const D = category === "world" ? WORLD_SCALE_D : JP_SCALE_D;
+  return Math.max(0, Math.round(5000 * Math.exp((-10 * distanceKm) / D)));
 }
 
-function toleranceKmForCategory(category) {
-  // 世界のみ採点対象の上限距離を設ける。日本・お試しは式自体が遠距離で0に収束するため上限なし。
-  if (category === "world") return 50;
+function toleranceKmForCategory() {
+  // 採点上限は設けない。得点式（指数減衰）自体が遠距離で0に収束するため。
   return Infinity;
 }
 
