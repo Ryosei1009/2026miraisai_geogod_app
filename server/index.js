@@ -198,8 +198,8 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 
 // 得点：S = 5000 × e^(−10·d/D)（d=誤差km）。d=0で5000点、距離に対し指数的に減衰する。
 // スケール D はマップごとに変える（小さいほど早く減衰）。
-const JP_SCALE_D = 2300; // 日本・お試し（km）
-const WORLD_SCALE_D = 22465; // 世界（km）
+const JP_SCALE_D = 1150; // 日本・お試し（km）。小さいほど減衰が速く=得点が取りづらい
+const WORLD_SCALE_D = 11232; // 世界（km）
 
 function scoreFromDistance(distanceKm, category) {
   const D = category === "world" ? WORLD_SCALE_D : JP_SCALE_D;
