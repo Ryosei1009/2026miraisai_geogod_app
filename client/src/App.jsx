@@ -694,6 +694,8 @@ export default function App() {
                         finalRankingVisible={Boolean(gameState.finalRankingVisible)}
                         announcement={gameState.announcement || null}
                         revealStep={gameState.revealStep || 0}
+                        answerRevealed={Boolean(gameState.answerRevealed)}
+                        recentResults={gameState.recentResults || []}
                     />
                 )}
             </ExpoShell>
@@ -764,6 +766,15 @@ export default function App() {
                             "やめる"
                         )
                     }
+                    onRevealAnswer={() => send({ type: "admin:revealAnswer" })}
+                    onShowRanking={() =>
+                        confirmAndSend(
+                            "ランキング発表に進みます。よろしいですか？",
+                            { type: "admin:showRanking" },
+                            "発表へ",
+                            "やめる"
+                        )
+                    }
                     onRevealNext={() => send({ type: "admin:revealNext" })}
                     onRevealPrev={() => send({ type: "admin:revealPrev" })}
                     onFinishGood={() =>
@@ -806,6 +817,7 @@ export default function App() {
                 onPick={handlePick}
                 canAnswer={canAnswer}
                 revealedAnswer={revealedAnswer}
+                answerRevealed={Boolean(gameState.answerRevealed)}
                 performers={performers}
                 currentIndex={currentIndex}
                 stats={stats}

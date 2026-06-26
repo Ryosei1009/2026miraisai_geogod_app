@@ -128,12 +128,14 @@ const questions = [
 // 日本カテゴリの最終問題インデックス。締切後にこの問題なら「日本ランキング発表」へ入る
 const LAST_JAPAN_INDEX = questions.reduce((acc, q, i) => (q.category === "japan" ? i : acc), -1);
 
+// photo: ランキングの表彰台で表示する顔写真。client/public/performers/ にファイルを置く。
+// （ファイルが無い／読み込めない場合はクライアント側で自動的にプレースホルダーの丸になる）
 const performers = [
-  { id: 1, no: "No.1", name: "グループA" },
-  { id: 2, no: "No.2", name: "グループB" },
-  { id: 3, no: "No.3", name: "グループC" },
-  { id: 4, no: "No.4", name: "グループD" },
-  { id: 5, no: "No.5", name: "篠原 諒成" }
+  { id: 1, no: "No.1", name: "グループA", photo: "/performers/1.jpg" },
+  { id: 2, no: "No.2", name: "グループB", photo: "/performers/2.jpg" },
+  { id: 3, no: "No.3", name: "グループC", photo: "/performers/3.jpg" },
+  { id: 4, no: "No.4", name: "グループD", photo: "/performers/4.jpg" },
+  { id: 5, no: "No.5", name: "篠原 諒成", photo: "/performers/5.jpg" }
 ];
 
 let currentMode = "geo";
@@ -143,6 +145,10 @@ const geoState = {
   currentQuestionIndex: 0,
   // 全問終了後、運営が「総合ランキングを表示する」を押すと true になる
   finalRankingVisible: false,
+  // 締切後、運営が「答えを表示」を押すと true（結果マップ＝ピン・正解を公開）
+  answerRevealed: false,
+  // カテゴリ最終問題の答え表示後、運営が「ランキング発表へ」を押すと true（段階発表に入る）
+  announcementActive: false,
   // ランキング発表（3位→2位→1位）の公開済み件数。0=非表示, 3=全公開
   revealStep: 0
 };
@@ -190,15 +196,27 @@ function haversineKm(lat1, lng1, lat2, lng2) {
   return R * c;
 }
 
+// 日本・お試し：半径 JP_FULL_KM 以内は満点(5000)。それより遠いと指数関数で減衰し、
+// ちょうど 10km で約1000点になるよう係数 JP_DECAY_K を調整している（崖をなくし滑らかに0へ）。
+//   5000 * exp(-(10 - 0.05) / K) = 1000  →  K = (10 - 0.05) / ln(5)
+const JP_FULL_KM = 0.05; // 50m 以内は満点
+const JP_DECAY_K = (10 - JP_FULL_KM) / Math.log(5); // ≒ 6.182
+
 function scoreFromDistance(distanceKm, category) {
-  const distanceMeters = distanceKm * 1000;
-  const metersPerPoint = category === "world" ? 150 : 25;
-  return Math.max(0, Math.round(5000 - distanceMeters / metersPerPoint));
+  if (category === "world") {
+    // 世界は従来どおり（150m/点の線形）
+    const distanceMeters = distanceKm * 1000;
+    return Math.max(0, Math.round(5000 - distanceMeters / 150));
+  }
+  // 日本・お試し：50m以内=満点、以降は指数減衰（10kmで約1000点、約55kmで実質0点）
+  if (distanceKm <= JP_FULL_KM) return 5000;
+  return Math.max(0, Math.round(5000 * Math.exp(-(distanceKm - JP_FULL_KM) / JP_DECAY_K)));
 }
 
 function toleranceKmForCategory(category) {
+  // 世界のみ採点対象の上限距離を設ける。日本・お試しは式自体が遠距離で0に収束するため上限なし。
   if (category === "world") return 50;
-  return 10;
+  return Infinity;
 }
 
 function getAllParticipants() {
@@ -241,15 +259,35 @@ function buildCurrentPins() {
 }
 
 // 現在「段階発表（3位→2位→1位）」を行う場面かどうかを判定する。
-// japan   = 日本全問終了後（日本最終問題の締切後）
-// world   = 世界全問終了後（全問終了 = finished）かつ総合表示前
 // combined= 運営が「総合ランキングを表示」を押した後
-// null    = 通常の各問題の結果（マップ＋上位3名をそのまま表示）
+// japan   = 日本最終問題の答え表示後、運営が「ランキング発表へ」を押した後
+// world   = 世界最終問題（全問終了）の答え表示後、運営が「ランキング発表へ」を押した後
+// null    = 通常の各問題の結果（マップ＋直近の距離・得点を表示）
 function currentAnnouncement() {
   if (geoState.finalRankingVisible) return "combined";
+  if (!geoState.announcementActive) return null;
   if (geoState.phase === "finished") return "world";
   if (geoState.phase === "closed" && geoState.currentQuestionIndex === LAST_JAPAN_INDEX) return "japan";
   return null;
+}
+
+// 答え表示後にカテゴリ最終問題なら「ランキング発表へ」ボタンを出せるか
+function canShowRanking() {
+  if (!geoState.answerRevealed) return false;
+  if (geoState.phase === "finished") return true;
+  return geoState.phase === "closed" && geoState.currentQuestionIndex === LAST_JAPAN_INDEX;
+}
+
+// 直近に締め切った問題の、参加者ごとの距離と得点（ランキング画面で答え表示後に出す）。
+// 今回の得点が高い順。答え表示前は空配列。
+function buildRecentResults() {
+  if (!geoState.answerRevealed) return [];
+  if (geoState.phase !== "closed" && geoState.phase !== "finished") return [];
+  const q = questions[geoState.currentQuestionIndex];
+  return getAllParticipants()
+    .filter((p) => p.lastRound && p.lastRound.questionId === q.id)
+    .map((p) => ({ name: p.name, gained: p.lastRound.gained, distanceKm: p.lastRound.distanceKm }))
+    .sort((a, b) => b.gained - a.gained);
 }
 
 function buildGeoBase() {
@@ -277,9 +315,15 @@ function buildGeoBase() {
     // ランキング発表の場面と、公開済み順位数（クライアントが段階表示に使う）
     announcement: currentAnnouncement(),
     revealStep: geoState.revealStep,
-    revealedAnswer: (geoState.phase === "closed" || geoState.phase === "finished") && currentQuestion
-      ? currentQuestion.answer
-      : null
+    // 締切後に運営が「答えを表示」を押したか。結果マップ・直近結果の公開可否に使う
+    answerRevealed: geoState.answerRevealed,
+    // 答え表示後にカテゴリ最終問題なら「ランキング発表へ」ボタンを出せる
+    canShowRanking: canShowRanking(),
+    // 正解は「答えを表示」後にのみ公開する
+    revealedAnswer:
+      (geoState.phase === "closed" || geoState.phase === "finished") && geoState.answerRevealed && currentQuestion
+        ? currentQuestion.answer
+        : null
   };
 }
 
@@ -294,9 +338,11 @@ function buildGeoStateFor(meta, cache = {}) {
     if (!cache.leaderboard) cache.leaderboard = buildLeaderboard();
     if (!cache.ranking) cache.ranking = buildRanking();
     if (!cache.allPins) cache.allPins = buildCurrentPins();
+    if (!cache.recentResults) cache.recentResults = buildRecentResults();
     state.leaderboard = cache.leaderboard;
     state.ranking = cache.ranking;
     state.allPins = cache.allPins;
+    state.recentResults = cache.recentResults;
   }
 
   if (meta?.role === "participant") {
@@ -563,7 +609,9 @@ function handleAdminGeoMessage(msg) {
 
     const isLast = geoState.currentQuestionIndex >= questions.length - 1;
     geoState.phase = isLast ? "finished" : "closed";
-    // 発表場面に入る場合は必ず非表示（revealStep=0）から始める
+    // 締切直後は答え非公開。運営が「答えを表示」を押すまで結果マップ・直近結果は出さない
+    geoState.answerRevealed = false;
+    geoState.announcementActive = false;
     geoState.revealStep = 0;
 
     // roundResult はクライアント側で AdminView のみが使用するため管理者にのみ送る
@@ -576,18 +624,37 @@ function handleAdminGeoMessage(msg) {
     return true;
   }
 
+  // 締切後、運営が「答えを表示」を押すと正解・全員のピンを公開する
+  if (msg.type === "admin:revealAnswer") {
+    if (geoState.phase !== "closed" && geoState.phase !== "finished") return true;
+    geoState.answerRevealed = true;
+    broadcastState();
+    return true;
+  }
+
+  // 答え表示後、カテゴリ最終問題なら「ランキング発表へ」で段階発表に入る
+  if (msg.type === "admin:showRanking") {
+    if (!canShowRanking()) return true;
+    geoState.announcementActive = true;
+    geoState.revealStep = 0;
+    broadcastState();
+    return true;
+  }
+
   if (msg.type === "admin:next") {
     if (geoState.phase !== "closed") return true;
     if (geoState.currentQuestionIndex >= questions.length - 1) return true;
     geoState.currentQuestionIndex += 1;
     geoState.phase = "active";
+    geoState.answerRevealed = false;
+    geoState.announcementActive = false;
     geoState.revealStep = 0;
     clearCurrentPins();
     broadcastState();
     return true;
   }
 
-  // 全問終了後、ランキング画面を「総合（日本+世界）」表示に切り替える
+  // 世界ランキング発表のあと、ランキング画面を「総合（日本+世界）」表示に切り替える
   if (msg.type === "admin:showFinalRanking") {
     if (geoState.phase !== "finished") return true;
     geoState.finalRankingVisible = true;
@@ -622,6 +689,8 @@ function handleAdminJumpMessage(msg) {
       geoState.currentQuestionIndex = clamped;
       geoState.phase = "active";
       geoState.finalRankingVisible = false;
+      geoState.answerRevealed = false;
+      geoState.announcementActive = false;
       geoState.revealStep = 0;
       clearCurrentPins();
       broadcastState();
@@ -864,6 +933,8 @@ function resetGeoGame({ forceRejoin = false } = {}) {
   geoState.phase = "waiting";
   geoState.currentQuestionIndex = 0;
   geoState.finalRankingVisible = false;
+  geoState.answerRevealed = false;
+  geoState.announcementActive = false;
   geoState.revealStep = 0;
   if (forceRejoin) {
     gameId = createGameId();

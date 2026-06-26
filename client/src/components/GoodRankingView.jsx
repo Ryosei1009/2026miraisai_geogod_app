@@ -1,3 +1,21 @@
+import { useState } from "react";
+
+// 表彰台/バーの顔写真。写真が無い・読み込めない場合は空の丸（プレースホルダー）にする。
+function Avatar({ src, alt, sizeClass, color, show }) {
+    const [failed, setFailed] = useState(false);
+    const showImg = show && src && !failed;
+    return (
+        <div
+            className={`flex-none overflow-hidden rounded-full border-4 bg-card ${sizeClass}`}
+            style={{ borderColor: color }}
+        >
+            {showImg && (
+                <img src={src} alt={alt} className="h-full w-full object-cover" onError={() => setFailed(true)} />
+            )}
+        </div>
+    );
+}
+
 // ゴッドタレントのスクリーン投影用ビュー（?rank=1・運営のみ、ジオのランキング画面と同じ導線）。
 // ・本番中: 現在の出演者と「投票受付中」を表示（票数は集計バイアスを避けるため見せない）
 // ・締め切り後: その出演者の票数とGood率を大きく表示
@@ -52,51 +70,94 @@ export default function GoodRankingView({ performers, stats, currentIndex, phase
         const isRevealed = (p) => revealStep >= revealStepForRank(p);
         const isRecap = revealStep >= n;
 
+        // 上位5位までを表示。1〜3位は表彰台（写真の丸＋％＋名前）、4〜5位は横長バー。
+        const top5 = finalRanking.slice(0, 5);
+        const podium = [
+            { row: top5[1], p: 2 }, // 左
+            { row: top5[0], p: 1 }, // 中央（最上位）
+            { row: top5[2], p: 3 } // 右
+        ];
+        const bars = top5.slice(3); // 4位・5位
+
         return (
-            <main className="page-shell min-h-screen p-4 pt-6 md:p-8 md:pt-16">
-                <div className="mx-auto max-w-[1200px]">
+            <main className="page-shell min-h-screen p-4 pt-6 md:p-8 md:pt-12">
+                <div className="mx-auto max-w-[1300px]">
                     <Header
                         title={isRecap ? "最終結果" : "ランキング発表"}
                         socketReady={socketReady}
                         badge="Good率"
                     />
 
-                    <div className="mt-6 space-y-3">
-                        {finalRanking.map((row, index) => {
-                            const p = index + 1;
-                            const revealed = isRevealed(p);
-                            const isNew = !isRecap && revealStepForRank(p) === revealStep;
+                    {/* 表彰台：2位(左) / 1位(中央) / 3位(右) */}
+                    <div className="mt-10 grid grid-cols-3 items-end gap-3 md:mt-14 md:gap-8">
+                        {podium.map(({ row, p }) => {
                             const color = rankColor(p);
+                            const revealed = Boolean(row) && isRevealed(p);
+                            const sizeClass =
+                                p === 1 ? "h-40 w-40 md:h-60 md:w-60" : "h-28 w-28 md:h-44 md:w-44";
+                            const lift = p === 1 ? "mb-6 md:mb-14" : p === 2 ? "mb-2 md:mb-6" : "";
+                            return (
+                                <div key={p} className={`flex flex-col items-center ${lift}`}>
+                                    <span className="num text-5xl font-black md:text-7xl" style={{ color }}>
+                                        {p}
+                                    </span>
+                                    <div className="mt-2">
+                                        <Avatar
+                                            src={revealed ? row.performer.photo : null}
+                                            alt={revealed ? row.performer.name : ""}
+                                            sizeClass={sizeClass}
+                                            color={revealed ? color : "var(--border-color)"}
+                                            show={revealed}
+                                        />
+                                    </div>
+                                    {revealed ? (
+                                        <p className="mt-3 text-center text-2xl font-black text-primary md:text-4xl">
+                                            <span className="num" style={{ color }}>
+                                                {Math.round(row.rate)}%
+                                            </span>{" "}
+                                            {row.performer.name}
+                                        </p>
+                                    ) : (
+                                        <p className="mt-3 text-center text-3xl font-black text-subtle md:text-4xl">？</p>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* 4位・5位：横長バー */}
+                    <div className="mx-auto mt-8 max-w-3xl space-y-3 md:mt-10">
+                        {bars.map((row, i) => {
+                            const p = i + 4;
+                            const color = rankColor(p);
+                            const revealed = Boolean(row) && isRevealed(p);
                             return (
                                 <div
-                                    key={row.performer.id}
-                                    className={`bg-card rounded-2xl border-2 px-5 py-4 transition md:px-8 ${isNew ? "shadow-xl" : ""}`}
-                                    style={{
-                                        borderColor: revealed ? color : "var(--border-color)",
-                                        borderLeftWidth: "12px",
-                                        borderLeftColor: revealed ? color : "var(--border-color)"
-                                    }}
+                                    key={row?.performer.id ?? p}
+                                    className="bg-card flex items-center gap-4 rounded-2xl border-2 px-5 py-3 md:px-8"
+                                    style={{ borderColor: revealed ? color : "var(--border-color)" }}
                                 >
+                                    <span className="num w-10 flex-none text-4xl font-black md:text-5xl" style={{ color }}>
+                                        {p}
+                                    </span>
+                                    <Avatar
+                                        src={revealed ? row.performer.photo : null}
+                                        alt={revealed ? row.performer.name : ""}
+                                        sizeClass="h-14 w-14 md:h-16 md:w-16"
+                                        color={revealed ? color : "var(--border-color)"}
+                                        show={revealed}
+                                    />
                                     {revealed ? (
-                                        <div className="flex items-center justify-between gap-4">
-                                            <div className="flex min-w-0 items-baseline gap-4">
-                                                <span className="num text-4xl font-black md:text-6xl" style={{ color }}>
-                                                    {p}
-                                                </span>
-                                                <span className="truncate text-3xl font-black text-primary md:text-5xl">
-                                                    {row.performer.name}
-                                                </span>
-                                            </div>
-                                            <span className="num flex-none text-4xl font-black text-primary md:text-6xl">
-                                                {row.rate.toFixed(1)}
-                                                <span className="ml-1 text-xl font-bold text-subtle md:text-2xl">%</span>
+                                        <>
+                                            <span className="truncate text-2xl font-black text-primary md:text-4xl">
+                                                {row.performer.name}
                                             </span>
-                                        </div>
+                                            <span className="num ml-auto flex-none text-3xl font-black md:text-4xl" style={{ color }}>
+                                                {Math.round(row.rate)}%
+                                            </span>
+                                        </>
                                     ) : (
-                                        <div className="flex items-center justify-between gap-4 text-subtle">
-                                            <span className="num text-4xl font-black md:text-6xl">第{p}位</span>
-                                            <span className="text-3xl font-black md:text-4xl">？</span>
-                                        </div>
+                                        <span className="ml-2 text-2xl font-black text-subtle md:text-3xl">？</span>
                                     )}
                                 </div>
                             );

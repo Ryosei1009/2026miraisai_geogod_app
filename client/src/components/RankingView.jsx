@@ -162,7 +162,9 @@ export default function RankingView({
     allPins = [],
     finalRankingVisible = false,
     announcement = null,
-    revealStep = 0
+    revealStep = 0,
+    answerRevealed = false,
+    recentResults = []
 }) {
     const categoryKey = currentCategory || "trial";
     const isCombined = scoreMode === "combined" && (categoryKey === "japan" || categoryKey === "world");
@@ -202,7 +204,11 @@ export default function RankingView({
     // 3位(rankIndex2)→2位(rankIndex1)→1位(rankIndex0) の順に出す。
     const isRevealed = (rankIndex) => !isAnnouncement || 2 - rankIndex < revealStep;
 
-    const hasResultMap = !isAnnouncement;
+    const isClosed = phase === "closed" || phase === "finished";
+    const fmtDistance = (km) => {
+        if (km == null || !Number.isFinite(km)) return "—";
+        return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
+    };
 
     return (
         <main className="page-shell min-h-screen p-4 pt-6 md:p-8 md:pt-12">
@@ -224,10 +230,11 @@ export default function RankingView({
                     </div>
                 </div>
 
-                {ranking.length === 0 ? (
+                {isAnnouncement ? (
+                  ranking.length === 0 ? (
                     <p className="mt-12 text-4xl text-muted">現在のランキングはありません。</p>
-                ) : (
-                    <div className={`grid items-end gap-5 md:grid-cols-3 ${isAnnouncement ? "mt-10" : "mt-5"}`}>
+                  ) : (
+                    <div className="mt-10 grid items-end gap-5 md:grid-cols-3">
                         {podiumOrder.map((rankIndex) => {
                             const row = topThree[rankIndex];
                             if (!row) return null;
@@ -276,20 +283,76 @@ export default function RankingView({
                             );
                         })}
                     </div>
-                )}
+                  )
+                ) : (
+                    <>
+                        {/* 通常の問題：結果マップ＋直近の距離・得点（今回の得点が高い順） */}
+                        <div className="mt-4 overflow-hidden rounded-2xl border-2 border-theme bg-card">
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-theme px-5 py-2">
+                                <p className="heading-chip text-lg font-bold text-primary">
+                                    結果マップ
+                                    {isClosed && Number.isFinite(currentQuestionIndex) ? `　第${currentQuestionIndex + 1}問` : ""}
+                                </p>
+                                {isClosed && answerRevealed ? (
+                                    <div className="flex items-center gap-5 text-base font-bold">
+                                        <span className="flex items-center gap-2 text-primary">
+                                            <span className="h-4 w-4 rounded-full border-2 border-white bg-[var(--expo-blue)]" aria-hidden="true" />
+                                            参加者の回答（{allPins.length}人）
+                                        </span>
+                                        <span className="flex items-center gap-2 text-primary">
+                                            <span className="h-4 w-4 rounded-full bg-[var(--expo-red)]" aria-hidden="true" />
+                                            正解
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <p className="text-base text-muted">
+                                        {isClosed ? "「答えを表示」で正解とピンが表示されます" : "回答締め切り後に表示されます"}
+                                    </p>
+                                )}
+                            </div>
+                            <div className="h-[38vh] w-full">
+                                <ResultMap
+                                    phase={phase}
+                                    currentQuestionIndex={currentQuestionIndex}
+                                    currentCategory={categoryKey}
+                                    revealedAnswer={answerRevealed ? revealedAnswer : null}
+                                    allPins={answerRevealed ? allPins : []}
+                                />
+                            </div>
+                        </div>
 
-                {hasResultMap && (
-                <div className="mt-4 overflow-hidden rounded-2xl border-2 border-theme bg-card">
-                    <div className="h-[38vh] w-full">
-                        <ResultMap
-                            phase={phase}
-                            currentQuestionIndex={currentQuestionIndex}
-                            currentCategory={categoryKey}
-                            revealedAnswer={revealedAnswer}
-                            allPins={allPins}
-                        />
-                    </div>
-                </div>
+                        <div className="mt-4">
+                            <h3 className="heading-chip text-3xl font-black text-primary md:text-4xl">直近の結果</h3>
+                            {answerRevealed && recentResults.length > 0 ? (
+                                <ol className="mt-3 grid gap-x-10 gap-y-2 md:grid-cols-2">
+                                    {recentResults.map((row, index) => (
+                                        <li
+                                            key={row.name + index}
+                                            className="flex items-baseline justify-between gap-4 border-b-2 border-theme py-2"
+                                        >
+                                            <div className="flex min-w-0 items-baseline gap-4">
+                                                <span className="num w-12 flex-none text-right text-2xl font-bold text-subtle md:text-3xl">
+                                                    {index + 1}
+                                                </span>
+                                                <span className="truncate text-2xl font-black text-primary md:text-4xl">{row.name}</span>
+                                            </div>
+                                            <div className="flex flex-none items-baseline gap-6">
+                                                <span className="num text-xl font-bold text-subtle md:text-2xl">{fmtDistance(row.distanceKm)}</span>
+                                                <span className="num w-28 text-right text-3xl font-black text-primary md:text-4xl">
+                                                    {row.gained}
+                                                    <span className="ml-1 text-lg font-bold text-subtle">pt</span>
+                                                </span>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ol>
+                            ) : (
+                                <p className="mt-3 text-2xl text-muted md:text-3xl">
+                                    {isClosed ? "「答えを表示」を押すと距離と得点が出ます" : "回答受付中..."}
+                                </p>
+                            )}
+                        </div>
+                    </>
                 )}
             </div>
         </main>

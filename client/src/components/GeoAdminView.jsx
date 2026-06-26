@@ -13,6 +13,8 @@ export default function GeoAdminView({
     onReset,
     onJumpGeo,
     onShowFinal,
+    onRevealAnswer,
+    onShowRanking,
     onRevealNext,
     onRevealPrev,
     formatDistance
@@ -36,6 +38,11 @@ export default function GeoAdminView({
 
     const primaryBtn = "btn-main w-full rounded-xl px-4 py-3 font-bold";
     const secondaryBtn = "btn-outline w-full rounded-xl px-4 py-3 font-bold disabled:opacity-40";
+
+    // 締切→答え表示→（最終問なら）ランキング発表へ、の進行状態
+    const isClosedPhase = phase === "closed" || phase === "finished";
+    const answerRevealed = Boolean(gameState.answerRevealed);
+    const canShowRanking = Boolean(gameState.canShowRanking);
 
     // ランキング段階発表（3位→2位→1位）の状態。announcement が立っている場面でのみ操作。
     const announcement = gameState.announcement || null;
@@ -95,9 +102,21 @@ export default function GeoAdminView({
                             制限時間終了・回答締切
                         </button>
                         <button
-                            className={phase === "closed" ? primaryBtn : secondaryBtn}
+                            className={isClosedPhase && !answerRevealed ? primaryBtn : secondaryBtn}
+                            onClick={onRevealAnswer}
+                            disabled={!isClosedPhase || answerRevealed}
+                        >
+                            答えを表示
+                        </button>
+                        {canShowRanking && !announcement && (
+                            <button className={primaryBtn} onClick={onShowRanking}>
+                                ランキング発表へ
+                            </button>
+                        )}
+                        <button
+                            className={phase === "closed" && answerRevealed ? primaryBtn : secondaryBtn}
                             onClick={onNext}
-                            disabled={phase !== "closed"}
+                            disabled={phase !== "closed" || !answerRevealed}
                         >
                             次の問題へ
                         </button>
@@ -145,7 +164,8 @@ export default function GeoAdminView({
                         <div className="bg-card-soft mt-5 rounded-xl p-4 text-primary">
                             <p className="text-sm text-muted">最終結果</p>
                             <p className="text-xl font-bold">全問終了です。お疲れさまでした。</p>
-                            {!gameState.finalRankingVisible && (
+                            {/* 世界ランキング発表に入ってから「総合」を出せる（発表前のスキップを防ぐ） */}
+                            {announcement === "world" && (
                                 <button
                                     className="btn-main mt-4 w-full rounded-xl px-4 py-3 font-bold"
                                     onClick={onShowFinal}

@@ -26,7 +26,7 @@ const mapOptions = {
     ]
 };
 
-export default function GeoPlayerView({ phase, player, currentCategory, currentQuestionIndex, playerAnswer, pin, onPick, canAnswer, revealedAnswer, error, formatDistance }) {
+export default function GeoPlayerView({ phase, player, currentCategory, currentQuestionIndex, playerAnswer, pin, onPick, canAnswer, revealedAnswer, answerRevealed = false, error, formatDistance }) {
     const mapRef = useRef(null);
     const scoreBucket = player?.scores || { trial: 0, japan: 0, world: 0 };
     const scoreLabels = { trial: "お試し", japan: "日本", world: "世界" };
@@ -76,6 +76,9 @@ export default function GeoPlayerView({ phase, player, currentCategory, currentQ
     const showMap = !isKeyMissing && !loadError && isLoaded;
     const showMapLoading = !isKeyMissing && !loadError && !isLoaded;
     const lastRound = player?.lastRound || {};
+    const isClosed = phase === "closed" || phase === "finished";
+    // 締切後は運営が「答えを表示」を押すまで距離・得点を伏せる
+    const showResult = !isClosed || answerRevealed;
 
     return (
         <main className="page-shell h-screen-safe overflow-hidden">
@@ -102,8 +105,8 @@ export default function GeoPlayerView({ phase, player, currentCategory, currentQ
                         }}
                     >
                         {pin && <MarkerF position={pin} />}
-                        {phase === "closed" && revealedAnswer && <MarkerF position={revealedAnswer} icon={correctPinIcon} />}
-                        {phase === "closed" && playerAnswer && <MarkerF position={playerAnswer} />}
+                        {isClosed && revealedAnswer && <MarkerF position={revealedAnswer} icon={correctPinIcon} />}
+                        {isClosed && playerAnswer && <MarkerF position={playerAnswer} />}
                     </GoogleMap>
                 )}
 
@@ -134,10 +137,16 @@ export default function GeoPlayerView({ phase, player, currentCategory, currentQ
                                         <p className="num -mt-1 text-3xl font-extrabold text-accent md:text-4xl">{activeScore}</p>
                                     </div>
                                 </div>
-                                <div className="num mt-3 grid grid-cols-2 gap-1 border-t border-theme pt-2 text-sm text-muted">
-                                    <p>前問距離: {formatDistance(lastRound.distanceKm)}</p>
-                                    <p>前問得点: {lastRound.gained ?? 0}</p>
-                                </div>
+                                {showResult ? (
+                                    <div className="num mt-3 grid grid-cols-2 gap-1 border-t border-theme pt-2 text-sm text-muted">
+                                        <p>前問距離: {formatDistance(lastRound.distanceKm)}</p>
+                                        <p>前問得点: {lastRound.gained ?? 0}</p>
+                                    </div>
+                                ) : (
+                                    <div className="mt-3 border-t border-theme pt-2 text-sm font-bold text-muted">
+                                        答え発表をお待ちください...
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
