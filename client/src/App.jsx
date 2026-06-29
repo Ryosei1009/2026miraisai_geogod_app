@@ -598,7 +598,7 @@ export default function App() {
 
     if (!joined) {
         return (
-            <ExpoShell socketReady={socketReady}>
+            <ExpoShell socketReady={socketReady} showQr={!wantsAdmin}>
                 <main className={`page-shell min-h-screen p-4 md:p-10`}>
                     <section className="glass-card doc-card mx-auto mt-14 max-w-xl p-8">
                         <p className="heading-chip text-xs font-bold uppercase tracking-[0.18em] text-subtle">
@@ -810,7 +810,7 @@ export default function App() {
     }
 
     return (
-        <ExpoShell socketReady={socketReady}>
+        <ExpoShell socketReady={socketReady} showQr>
             <PlayerView
                 mode={mode}
                 phase={phase}
