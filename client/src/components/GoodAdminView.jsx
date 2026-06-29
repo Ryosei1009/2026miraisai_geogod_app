@@ -102,6 +102,10 @@ export default function GoodAdminView({
         })
         .sort((a, b) => b.rate - a.rate);
 
+    // ジオ運営画面と統一：操作ボタンは全幅・縦積み（primary=今すべき操作 / secondary=戻る等）
+    const primaryBtn = "btn-main w-full rounded-xl px-4 py-3 font-bold disabled:opacity-40";
+    const secondaryBtn = "btn-outline w-full rounded-xl px-4 py-3 font-bold disabled:opacity-40";
+
     return (
         <main className="page-shell min-h-screen p-3 pt-6 md:p-6 md:pt-8">
             {phase === "live" && (
@@ -147,79 +151,65 @@ export default function GoodAdminView({
 
                     <div className="mt-5 space-y-2">
                         {phase === "waiting" && (
-                            <button className="btn-main w-full rounded-xl px-4 py-3 font-bold" onClick={onStart}>
+                            <button className={primaryBtn} onClick={onStart}>
                                 開始
                             </button>
                         )}
 
                         {phase === "live" && (
-                            <div className="grid grid-cols-2 gap-2">
+                            <>
                                 <button
-                                    className="btn-outline rounded-xl px-4 py-3 font-bold disabled:opacity-40"
-                                    onClick={onBack}
-                                    disabled={currentIndex <= 0}
-                                >
-                                    戻る
-                                </button>
-                                <button
-                                    className="btn-main rounded-xl px-4 py-3 font-bold disabled:opacity-40"
+                                    className={primaryBtn}
                                     onClick={onNext}
                                     disabled={currentIndex < 0}
                                 >
                                     締め切り
                                 </button>
-                            </div>
+                                <button
+                                    className={secondaryBtn}
+                                    onClick={onBack}
+                                    disabled={currentIndex <= 0}
+                                >
+                                    戻る
+                                </button>
+                            </>
                         )}
 
                         {phase === "review" && (
-                            <div className="grid grid-cols-2 gap-2">
-                                <button
-                                    className="btn-outline rounded-xl px-4 py-3 font-bold"
-                                    onClick={onBack}
-                                >
-                                    投票に戻る
-                                </button>
-                                <button
-                                    className="btn-main rounded-xl px-4 py-3 font-bold"
-                                    onClick={onNext}
-                                >
+                            <>
+                                <button className={primaryBtn} onClick={onNext}>
                                     {currentIndex >= performers.length - 1 ? "ランキング発表へ" : "次の出演者"}
                                 </button>
-                            </div>
+                                <button className={secondaryBtn} onClick={onBack}>
+                                    投票に戻る
+                                </button>
+                            </>
                         )}
 
                         {phase === "ranking" && (
-                            <div className="space-y-2">
+                            <>
                                 <p className="num text-sm text-muted">発表ステップ: {revealStep} / {n}</p>
                                 <button
-                                    className="btn-main w-full rounded-xl px-4 py-3 font-bold disabled:opacity-40"
+                                    className={primaryBtn}
                                     onClick={onRevealNext}
                                     disabled={revealStep >= n}
                                 >
                                     {revealNextLabel}
                                 </button>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <button
-                                        className="btn-outline rounded-xl px-4 py-3 font-bold disabled:opacity-40"
-                                        onClick={onRevealPrev}
-                                        disabled={revealStep <= 0}
-                                    >
-                                        1つ戻す
-                                    </button>
-                                    <button
-                                        className="btn-outline rounded-xl px-4 py-3 font-bold"
-                                        onClick={onBack}
-                                    >
-                                        締切後へ戻る
-                                    </button>
-                                </div>
                                 <button
-                                    className="btn-dark w-full rounded-xl px-4 py-3 font-bold"
-                                    onClick={onFinishGood}
+                                    className={secondaryBtn}
+                                    onClick={onRevealPrev}
+                                    disabled={revealStep <= 0}
                                 >
+                                    1つ戻す
+                                </button>
+                                <button className={secondaryBtn} onClick={onBack}>
+                                    締切後へ戻る
+                                </button>
+                                <button className="btn-dark w-full rounded-xl px-4 py-3 font-bold" onClick={onFinishGood}>
                                     発表終了・待機へ
                                 </button>
-                            </div>
+                            </>
                         )}
                     </div>
 

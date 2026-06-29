@@ -143,6 +143,16 @@ export default function GeoAdminView({
                             >
                                 1つ戻す
                             </button>
+                            {/* 世界ランキングを最後まで発表したら、続けて総合ランキングへ */}
+                            {announcement === "world" && (
+                                <button
+                                    className="btn-main mt-3 w-full rounded-xl px-4 py-3 text-lg font-bold disabled:opacity-40"
+                                    onClick={onShowFinal}
+                                    disabled={revealStep < 3}
+                                >
+                                    総合ランキングを表示
+                                </button>
+                            )}
                         </div>
                     )}
 
@@ -164,15 +174,6 @@ export default function GeoAdminView({
                         <div className="bg-card-soft mt-5 rounded-xl p-4 text-primary">
                             <p className="text-sm text-muted">最終結果</p>
                             <p className="text-xl font-bold">全問終了です。お疲れさまでした。</p>
-                            {/* 世界ランキング発表に入ってから「総合」を出せる（発表前のスキップを防ぐ） */}
-                            {announcement === "world" && (
-                                <button
-                                    className="btn-main mt-4 w-full rounded-xl px-4 py-3 font-bold"
-                                    onClick={onShowFinal}
-                                >
-                                    総合ランキングを表示
-                                </button>
-                            )}
                         </div>
                     )}
 
