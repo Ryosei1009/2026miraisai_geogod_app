@@ -111,18 +111,20 @@ function createGameId() {
 
 let gameId = createGameId();
 
+// name = 答え発表で表示する正式名称、photo = 問題写真のパス（client/public/questions/ 配下）。
+// 写真が無い場合は答え発表画面側で自動的にプレースホルダ表示になる。
 const questions = [
-  { id: 1, title: "お試し: 東京駅", answer: { lat: 35.681659075025316, lng: 139.76476867091722 }, category: "trial" },
-  { id: 2, title: "日本1: 姫路城", answer: { lat: 34.83784159253512, lng: 134.69253631521838 }, category: "japan" },
-  { id: 3, title: "日本2: 金閣寺", answer: { lat: 35.038931634090375, lng: 135.72872765086015 }, category: "japan" },
-  { id: 4, title: "日本3: 阿蘇山", answer: { lat: 32.8847, lng: 131.1043 }, category: "japan" },
-  { id: 5, title: "日本4: 弘前城", answer: { lat: 40.60707, lng: 140.46412 }, category: "japan" },
-  { id: 6, title: "日本5: 松山城", answer: { lat: 33.84584, lng: 132.7654 }, category: "japan" },
-  { id: 7, title: "世界1: エッフェル塔", answer: { lat: 48.85837, lng: 2.29448 }, category: "world" },
-  { id: 8, title: "世界2: 自由の女神", answer: { lat: 40.68925, lng: -74.0445 }, category: "world" },
-  { id: 9, title: "世界3: コロッセオ", answer: { lat: 41.89021, lng: 12.49223 }, category: "world" },
-  { id: 10, title: "世界4: ピラミッド", answer: { lat: 29.97924, lng: 31.1342 }, category: "world" },
-  { id: 11, title: "世界5: シドニー・オペラハウス", answer: { lat: -33.85678, lng: 151.2153 }, category: "world" }
+  { id: 1, title: "お試し: 東京駅", name: "東京駅", photo: "/questions/q1.jpg", answer: { lat: 35.681659075025316, lng: 139.76476867091722 }, category: "trial" },
+  { id: 2, title: "日本1: 姫路城", name: "姫路城", photo: "/questions/q2.jpg", answer: { lat: 34.83784159253512, lng: 134.69253631521838 }, category: "japan" },
+  { id: 3, title: "日本2: 金閣寺", name: "金閣寺", photo: "/questions/q3.jpg", answer: { lat: 35.038931634090375, lng: 135.72872765086015 }, category: "japan" },
+  { id: 4, title: "日本3: 阿蘇山", name: "阿蘇山", photo: "/questions/q4.jpg", answer: { lat: 32.8847, lng: 131.1043 }, category: "japan" },
+  { id: 5, title: "日本4: 弘前城", name: "弘前城", photo: "/questions/q5.jpg", answer: { lat: 40.60707, lng: 140.46412 }, category: "japan" },
+  { id: 6, title: "日本5: 松山城", name: "松山城", photo: "/questions/q6.jpg", answer: { lat: 33.84584, lng: 132.7654 }, category: "japan" },
+  { id: 7, title: "世界1: エッフェル塔", name: "エッフェル塔", photo: "/questions/q7.jpg", answer: { lat: 48.85837, lng: 2.29448 }, category: "world" },
+  { id: 8, title: "世界2: 自由の女神", name: "自由の女神", photo: "/questions/q8.jpg", answer: { lat: 40.68925, lng: -74.0445 }, category: "world" },
+  { id: 9, title: "世界3: コロッセオ", name: "コロッセオ", photo: "/questions/q9.jpg", answer: { lat: 41.89021, lng: 12.49223 }, category: "world" },
+  { id: 10, title: "世界4: ピラミッド", name: "ギザの大ピラミッド", photo: "/questions/q10.jpg", answer: { lat: 29.97924, lng: 31.1342 }, category: "world" },
+  { id: 11, title: "世界5: シドニー・オペラハウス", name: "シドニー・オペラハウス", photo: "/questions/q11.jpg", answer: { lat: -33.85678, lng: 151.2153 }, category: "world" }
 ];
 
 // 日本カテゴリの最終問題インデックス。締切後にこの問題なら「日本ランキング発表」へ入る
@@ -315,6 +317,15 @@ function buildGeoBase() {
     revealedAnswer:
       (geoState.phase === "closed" || geoState.phase === "finished") && geoState.answerRevealed && currentQuestion
         ? currentQuestion.answer
+        : null,
+    // 答え発表用の正式名称・写真も「答えを表示」後にのみ公開する（プレイ中に答えを漏らさない）
+    revealedName:
+      (geoState.phase === "closed" || geoState.phase === "finished") && geoState.answerRevealed && currentQuestion
+        ? currentQuestion.name
+        : null,
+    revealedPhoto:
+      (geoState.phase === "closed" || geoState.phase === "finished") && geoState.answerRevealed && currentQuestion
+        ? currentQuestion.photo
         : null
   };
 }

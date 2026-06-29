@@ -1,5 +1,27 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { GoogleMap, MarkerF, useJsApiLoader } from "@react-google-maps/api";
+
+// 答え発表の写真。未設定・読み込み失敗時はプレースホルダにフォールバックする。
+function AnswerPhoto({ src, alt }) {
+    const [failed, setFailed] = useState(false);
+    if (!src || failed) {
+        return (
+            <div className="flex h-[38vh] items-center justify-center rounded-2xl border-2 border-dashed border-theme bg-card-soft">
+                <p className="text-2xl font-bold text-subtle">写真は準備中です</p>
+            </div>
+        );
+    }
+    return (
+        <div className="h-[38vh] overflow-hidden rounded-2xl border-2 border-theme bg-card">
+            <img
+                src={src}
+                alt={alt || "問題の写真"}
+                className="h-full w-full object-cover"
+                onError={() => setFailed(true)}
+            />
+        </div>
+    );
+}
 
 // プロジェクター投影用ランキング。ホール後方からも読めるよう
 // 文字サイズを大きく取り、上位3名を表彰台で強調する。
@@ -159,6 +181,8 @@ export default function RankingView({
     phase,
     currentQuestionIndex,
     revealedAnswer,
+    revealedName = null,
+    revealedPhoto = null,
     allPins = [],
     finalRankingVisible = false,
     announcement = null,
@@ -286,39 +310,49 @@ export default function RankingView({
                   )
                 ) : (
                     <>
-                        {/* 通常の問題：結果マップ＋直近の距離・得点（今回の得点が高い順） */}
-                        <div className="mt-4 overflow-hidden rounded-2xl border-2 border-theme bg-card">
-                            <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-theme px-5 py-2">
-                                <p className="heading-chip text-lg font-bold text-primary">
-                                    結果マップ
-                                    {isClosed && Number.isFinite(currentQuestionIndex) ? `　第${currentQuestionIndex + 1}問` : ""}
-                                </p>
-                                {isClosed && answerRevealed ? (
-                                    <div className="flex items-center gap-5 text-base font-bold">
-                                        <span className="flex items-center gap-2 text-primary">
-                                            <span className="h-4 w-4 rounded-full border-2 border-white bg-[var(--expo-blue)]" aria-hidden="true" />
-                                            参加者の回答（{allPins.length}人）
-                                        </span>
-                                        <span className="flex items-center gap-2 text-primary">
-                                            <span className="h-4 w-4 rounded-full bg-[var(--expo-red)]" aria-hidden="true" />
-                                            正解
-                                        </span>
-                                    </div>
-                                ) : (
-                                    <p className="text-base text-muted">
-                                        {isClosed ? "「答えを表示」で正解とピンが表示されます" : "回答締め切り後に表示されます"}
+                        {/* 答え発表：場所の名称を大きく表示（答えを表示後のみ） */}
+                        {isClosed && answerRevealed && revealedName && (
+                            <p className="mt-4 text-center text-5xl font-black text-primary md:text-7xl">
+                                {revealedName}
+                            </p>
+                        )}
+
+                        {/* 通常の問題：結果マップ（＋答え表示後は問題写真を横並び） */}
+                        <div className={`mt-4 grid gap-4 ${answerRevealed ? "md:grid-cols-2" : ""}`}>
+                            <div className="overflow-hidden rounded-2xl border-2 border-theme bg-card">
+                                <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-theme px-5 py-2">
+                                    <p className="heading-chip text-lg font-bold text-primary">
+                                        結果マップ
+                                        {isClosed && Number.isFinite(currentQuestionIndex) ? `　第${currentQuestionIndex + 1}問` : ""}
                                     </p>
-                                )}
+                                    {isClosed && answerRevealed ? (
+                                        <div className="flex items-center gap-5 text-base font-bold">
+                                            <span className="flex items-center gap-2 text-primary">
+                                                <span className="h-4 w-4 rounded-full border-2 border-white bg-[var(--expo-blue)]" aria-hidden="true" />
+                                                参加者の回答（{allPins.length}人）
+                                            </span>
+                                            <span className="flex items-center gap-2 text-primary">
+                                                <span className="h-4 w-4 rounded-full bg-[var(--expo-red)]" aria-hidden="true" />
+                                                正解
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <p className="text-base text-muted">
+                                            {isClosed ? "「答えを表示」で正解とピンが表示されます" : "回答締め切り後に表示されます"}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="h-[38vh] w-full">
+                                    <ResultMap
+                                        phase={phase}
+                                        currentQuestionIndex={currentQuestionIndex}
+                                        currentCategory={categoryKey}
+                                        revealedAnswer={answerRevealed ? revealedAnswer : null}
+                                        allPins={answerRevealed ? allPins : []}
+                                    />
+                                </div>
                             </div>
-                            <div className="h-[38vh] w-full">
-                                <ResultMap
-                                    phase={phase}
-                                    currentQuestionIndex={currentQuestionIndex}
-                                    currentCategory={categoryKey}
-                                    revealedAnswer={answerRevealed ? revealedAnswer : null}
-                                    allPins={answerRevealed ? allPins : []}
-                                />
-                            </div>
+                            {answerRevealed && <AnswerPhoto src={revealedPhoto} alt={revealedName} />}
                         </div>
 
                         <div className="mt-4">

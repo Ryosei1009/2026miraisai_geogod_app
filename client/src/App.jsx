@@ -690,6 +690,8 @@ export default function App() {
                         phase={gameState.phase}
                         currentQuestionIndex={gameState.currentQuestionIndex}
                         revealedAnswer={gameState.revealedAnswer}
+                        revealedName={gameState.revealedName || null}
+                        revealedPhoto={gameState.revealedPhoto || null}
                         allPins={gameState.allPins || []}
                         finalRankingVisible={Boolean(gameState.finalRankingVisible)}
                         announcement={gameState.announcement || null}
