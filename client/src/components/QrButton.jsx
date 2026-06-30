@@ -14,10 +14,10 @@ export default function QrButton() {
             <button
                 type="button"
                 onClick={() => setOpen(true)}
-                className="btn-main fixed bottom-4 right-4 z-40 rounded-full px-5 py-3 text-sm font-bold shadow-lg"
+                className="btn-main fixed top-4 right-4 z-40 rounded-full px-5 py-3 text-sm font-bold shadow-lg"
                 aria-label="QRコードを表示"
             >
-                QRコード
+                QR
             </button>
 
             {open && (

@@ -165,6 +165,21 @@ body.theme-expo-dark {
     background: var(--accent);
 }
 
+/* 見出しの色チップ */
+.heading-chips {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+.heading-chips::before {
+    content: "";
+    flex: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 2px;
+    background: var(--accent);
+}
+
 /* ---------- テキスト・背景ユーティリティ（旧クラス名を維持） ---------- */
 .text-primary { color: var(--text-color); }
 .text-muted { color: var(--text-muted); }

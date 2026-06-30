@@ -14,6 +14,7 @@ export default function GeoAdminView({
     onJumpGeo,
     onShowFinal,
     onRevealAnswer,
+    onRevealRanking,
     onShowRanking,
     onRevealNext,
     onRevealPrev,
@@ -39,9 +40,10 @@ export default function GeoAdminView({
     const primaryBtn = "btn-main w-full rounded-xl px-4 py-3 font-bold";
     const secondaryBtn = "btn-outline w-full rounded-xl px-4 py-3 font-bold disabled:opacity-40";
 
-    // 締切→答え表示→（最終問なら）ランキング発表へ、の進行状態
+    // 締切→答え表示→その問題のランキング表示→（最終問なら）ランキング発表へ、の進行状態
     const isClosedPhase = phase === "closed" || phase === "finished";
     const answerRevealed = Boolean(gameState.answerRevealed);
+    const rankingRevealed = Boolean(gameState.rankingRevealed);
     const canShowRanking = Boolean(gameState.canShowRanking);
 
     // ランキング段階発表（3位→2位→1位）の状態。announcement が立っている場面でのみ操作。
@@ -72,7 +74,6 @@ export default function GeoAdminView({
                         </button>
                     </div>
 
-                    <p className="heading-chip text-xs font-bold uppercase tracking-[0.18em] text-subtle">STAFF CONTROL</p>
                     <h2 className="mt-2 text-3xl font-black text-primary">運営コントロール</h2>
                     <p className="num mt-2 text-muted">問題 {currentQuestionNo} / {questionCount}</p>
                     <p className="mt-1 text-muted">状態: {phaseLabel}</p>
@@ -108,15 +109,22 @@ export default function GeoAdminView({
                         >
                             答えを表示
                         </button>
+                        <button
+                            className={isClosedPhase && answerRevealed && !rankingRevealed ? primaryBtn : secondaryBtn}
+                            onClick={onRevealRanking}
+                            disabled={!isClosedPhase || !answerRevealed || rankingRevealed}
+                        >
+                            その問題のランキングを表示
+                        </button>
                         {canShowRanking && !announcement && (
                             <button className={primaryBtn} onClick={onShowRanking}>
                                 ランキング発表へ
                             </button>
                         )}
                         <button
-                            className={phase === "closed" && answerRevealed ? primaryBtn : secondaryBtn}
+                            className={phase === "closed" && rankingRevealed ? primaryBtn : secondaryBtn}
                             onClick={onNext}
-                            disabled={phase !== "closed" || !answerRevealed}
+                            disabled={phase !== "closed" || !rankingRevealed}
                         >
                             次の問題へ
                         </button>

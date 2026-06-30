@@ -188,6 +188,7 @@ export default function RankingView({
     announcement = null,
     revealStep = 0,
     answerRevealed = false,
+    rankingRevealed = false,
     recentResults = []
 }) {
     const categoryKey = currentCategory || "trial";
@@ -221,6 +222,8 @@ export default function RankingView({
     // サーバーの並びは総得点順のため、表示中のスコアで並べ直して上位3名のみ使う
     const sortedRanking = [...ranking].sort((a, b) => getScoreValue(b) - getScoreValue(a));
     const topThree = sortedRanking.slice(0, 3);
+    // 4〜8位（1位発表と同時に表彰台の下へ出す）
+    const rest4to8 = sortedRanking.slice(3, 8);
     // 表彰台の並び：左=2位, 中央=1位, 右=3位（中央を高く見せる）
     const podiumOrder = [1, 0, 2];
 
@@ -236,113 +239,143 @@ export default function RankingView({
 
     return (
         <main className="page-shell min-h-screen p-4 pt-6 md:p-8 md:pt-12">
-            <div className="mx-auto max-w-[1600px]">
-                <div className="flex flex-wrap items-end justify-between gap-4 border-b-4 border-[var(--expo-black)] pb-3">
-                    <div>
-                        <p className="heading-chip text-base font-bold uppercase tracking-[0.22em] text-subtle">RESULT</p>
-                        <h2 className="mt-1 text-6xl font-black text-primary md:text-7xl">
-                            {isAnnouncement ? `${announcementLabel[announcement]} ランキング` : "ランキング"}
-                        </h2>
-                    </div>
-                    <div className="flex items-center gap-3 pb-2">
-                        <span className="rounded-full border-2 border-theme px-6 py-2 text-2xl font-bold text-primary md:text-3xl">{scoreLabel}</span>
-                        <span
-                            className={`h-5 w-5 rounded-full ${socketReady ? "bg-[var(--expo-blue)]" : "bg-[var(--expo-red)]"}`}
-                            title={socketReady ? "接続済み" : "接続中..."}
-                            aria-label={socketReady ? "接続済み" : "接続中..."}
-                        />
-                    </div>
-                </div>
-
+            <div className="mx-auto max-w-[1800px]">
                 {isAnnouncement ? (
-                  ranking.length === 0 ? (
-                    <p className="mt-12 text-4xl text-muted">現在のランキングはありません。</p>
-                  ) : (
-                    <div className="mt-10 grid items-end gap-5 md:grid-cols-3">
-                        {podiumOrder.map((rankIndex) => {
-                            const row = topThree[rankIndex];
-                            if (!row) return null;
-                            const podium = PODIUM[rankIndex];
-                            const revealed = isRevealed(rankIndex);
-                            // 表彰台の高さ（中央=1位を最も高く）。発表場面では迫力を出すため大きめに。
-                            const padBottom =
-                                rankIndex === 0 ? "md:pb-24" : rankIndex === 1 ? "md:pb-14" : "md:pb-6";
+                    ranking.length === 0 ? (
+                        <p className="mt-12 text-4xl text-muted">現在のランキングはありません。</p>
+                    ) : (
+                      <>
+                        <div className="mt-10 grid items-end gap-5 md:grid-cols-3">
+                            {podiumOrder.map((rankIndex) => {
+                                const row = topThree[rankIndex];
+                                if (!row) return null;
+                                const podium = PODIUM[rankIndex];
+                                const revealed = isRevealed(rankIndex);
+                                // 表彰台の高さ（中央=1位を最も高く）。発表場面では迫力を出すため大きめに。
+                                const padBottom =
+                                    rankIndex === 0 ? "md:pb-24" : rankIndex === 1 ? "md:pb-14" : "md:pb-6";
 
-                            if (!revealed) {
-                                // 未公開：枠だけ残してシルエット表示（レイアウトを保つ）
+                                if (!revealed) {
+                                    // 未公開：枠だけ残してシルエット表示（レイアウトを保つ）
+                                    return (
+                                        <div
+                                            key={`hidden-${rankIndex}`}
+                                            className={`bg-card-soft rounded-2xl border-2 border-dashed border-theme p-5 ${padBottom}`}
+                                            style={{ borderTop: `12px solid ${podium.color}` }}
+                                        >
+                                            <div className="flex items-baseline gap-3">
+                                                <span className="num text-6xl font-black md:text-7xl" style={{ color: podium.color }}>
+                                                    {rankIndex + 1}
+                                                </span>
+                                                <span className="text-3xl font-bold text-subtle md:text-4xl">位</span>
+                                            </div>
+                                            <p className="mt-4 text-7xl font-black text-subtle md:text-8xl">？</p>
+                                        </div>
+                                    );
+                                }
+
                                 return (
                                     <div
-                                        key={`hidden-${rankIndex}`}
-                                        className={`bg-card-soft rounded-2xl border-2 border-dashed border-theme p-5 ${padBottom}`}
+                                        key={row.name + rankIndex}
+                                        className={`bg-card rounded-2xl border-2 border-theme p-5 md:px-7 ${padBottom}`}
                                         style={{ borderTop: `12px solid ${podium.color}` }}
                                     >
-                                        <div className="flex items-baseline gap-3">
+                                        <div className="flex min-w-0 items-baseline gap-4">
                                             <span className="num text-6xl font-black md:text-7xl" style={{ color: podium.color }}>
                                                 {rankIndex + 1}
                                             </span>
-                                            <span className="text-3xl font-bold text-subtle md:text-4xl">位</span>
+                                            <span className="truncate text-4xl font-black text-primary md:text-6xl">{row.name}</span>
                                         </div>
-                                        <p className="mt-4 text-7xl font-black text-subtle md:text-8xl">？</p>
+                                        <p className="num mt-3 text-7xl font-black text-primary md:text-8xl">
+                                            {getScoreValue(row)}
+                                            <span className="ml-3 text-3xl font-bold text-subtle">pt</span>
+                                        </p>
                                     </div>
                                 );
-                            }
+                            })}
+                        </div>
 
-                            return (
-                                <div
-                                    key={row.name + rankIndex}
-                                    className={`bg-card rounded-2xl border-2 border-theme p-5 md:px-7 ${padBottom}`}
-                                    style={{ borderTop: `12px solid ${podium.color}` }}
-                                >
-                                    <div className="flex min-w-0 items-baseline gap-4">
-                                        <span className="num text-6xl font-black md:text-7xl" style={{ color: podium.color }}>
-                                            {rankIndex + 1}
+                        {/* 1位発表（revealStep=3）と同時に 4〜8位を表彰台の下に表示 */}
+                        {revealStep >= 3 && rest4to8.length > 0 && (
+                            <ol className="mt-6 flex flex-col gap-y-4 mx-auto max-w-5xl">
+                                {rest4to8.map((row, index) => (
+                                    <li
+                                        key={row.name + index}
+                                        className="flex items-baseline justify-between gap-4 border-b-2 border-theme pb-1 pt-2 px-6"
+                                    >
+                                        <div className="flex min-w-0 items-baseline gap-4">
+                                            <span className="num w-12 flex-none text-right text-2xl font-bold text-subtle md:text-6xl">
+                                                {index + 4}
+                                            </span>
+                                            <span className="truncate text-2xl font-black text-primary md:text-6xl">{row.name}</span>
+                                        </div>
+                                        <span className="num flex-none text-2xl font-black text-primary md:text-6xl">
+                                            {getScoreValue(row)}
+                                            <span className="ml-2 text-lg font-bold text-subtle">pt</span>
                                         </span>
-                                        <span className="truncate text-4xl font-black text-primary md:text-5xl">{row.name}</span>
-                                    </div>
-                                    <p className="num mt-3 text-7xl font-black text-primary md:text-8xl">
-                                        {getScoreValue(row)}
-                                        <span className="ml-3 text-3xl font-bold text-subtle">pt</span>
-                                    </p>
-                                </div>
-                            );
-                        })}
-                    </div>
-                  )
-                ) : (
+                                    </li>
+                                ))}
+                            </ol>
+                        )}
+                      </>
+                    )
+                ) : rankingRevealed ? (
                     <>
-                        {/* 答え発表：場所の名称を大きく表示（答えを表示後のみ） */}
-                        {isClosed && answerRevealed && revealedName && (
-                            <p className="mt-4 text-center text-5xl font-black text-primary md:text-7xl">
-                                {revealedName}
-                            </p>
+                        {/* その問題のランキング：日本/世界/総合と同じ表彰台（上位3名）＋結果マップ */}
+                        <p className="heading-chips text-center text-2xl font-black text-primary md:text-7xl">
+                            ランキング
+                        </p>
+                        {ranking.length === 0 ? (
+                            <p className="mt-10 text-4xl text-muted">現在のランキングはありません。</p>
+                        ) : (
+                            <div className="mt-12 grid items-end gap-5 md:grid-cols-3">
+                                {podiumOrder.map((rankIndex) => {
+                                    const row = topThree[rankIndex];
+                                    if (!row) return null;
+                                    const podium = PODIUM[rankIndex];
+                                    const padBottom =
+                                        rankIndex === 0 ? "md:pb-16" : rankIndex === 1 ? "md:pb-10" : "md:pb-4";
+                                    return (
+                                        <div
+                                            key={row.name + rankIndex}
+                                            className={`bg-card rounded-2xl border-2 border-theme p-5 md:px-7 ${padBottom}`}
+                                            style={{ borderTop: `12px solid ${podium.color}` }}
+                                        >
+                                            <div className="flex min-w-0 items-baseline gap-4">
+                                                <span className="num text-5xl font-black md:text-6xl" style={{ color: podium.color }}>
+                                                    {rankIndex + 1}
+                                                </span>
+                                                <span className="truncate text-3xl font-black text-primary md:text-5xl">{row.name}</span>
+                                            </div>
+                                            <p className="num mt-3 text-6xl font-black text-primary md:text-7xl">
+                                                {getScoreValue(row)}
+                                                <span className="ml-3 text-2xl font-bold text-subtle">pt</span>
+                                            </p>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         )}
 
-                        {/* 通常の問題：結果マップ（＋答え表示後は問題写真を横並び） */}
-                        <div className={`mt-4 grid gap-4 ${answerRevealed ? "md:grid-cols-2" : ""}`}>
-                            <div className="overflow-hidden rounded-2xl border-2 border-theme bg-card">
-                                <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-theme px-5 py-2">
-                                    <p className="heading-chip text-lg font-bold text-primary">
-                                        結果マップ
-                                        {isClosed && Number.isFinite(currentQuestionIndex) ? `　第${currentQuestionIndex + 1}問` : ""}
-                                    </p>
-                                    {isClosed && answerRevealed ? (
-                                        <div className="flex items-center gap-5 text-base font-bold">
-                                            <span className="flex items-center gap-2 text-primary">
-                                                <span className="h-4 w-4 rounded-full border-2 border-white bg-[var(--expo-blue)]" aria-hidden="true" />
-                                                参加者の回答（{allPins.length}人）
-                                            </span>
-                                            <span className="flex items-center gap-2 text-primary">
-                                                <span className="h-4 w-4 rounded-full bg-[var(--expo-red)]" aria-hidden="true" />
-                                                正解
-                                            </span>
-                                        </div>
-                                    ) : (
-                                        <p className="text-base text-muted">
-                                            {isClosed ? "「答えを表示」で正解とピンが表示されます" : "回答締め切り後に表示されます"}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="h-[38vh] w-full">
+                        {/* 追加した結果マップ（正解＋全員の回答ピン） */}
+                        <div className="overflow-hidden rounded-2xl border-2 border-theme bg-card mx-12 mt-12">
+                            <div className="h-[50vh] w-full">
+                                <ResultMap
+                                    phase={phase}
+                                    currentQuestionIndex={currentQuestionIndex}
+                                    currentCategory={categoryKey}
+                                    revealedAnswer={revealedAnswer}
+                                    allPins={allPins}
+                                />
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        {/* 答え発表：結果マップ＋名称＋写真（ランキングはまだ出さない） */}
+                        <div className={`mt-4 flex gap-4 ${answerRevealed ? "md:grid-cols-2" : ""}`}>
+                            <div className="w-3/5 overflow-hidden rounded-2xl border-2 border-theme bg-card">
+                                <div className="h-[86vh] w-full">
                                     <ResultMap
                                         phase={phase}
                                         currentQuestionIndex={currentQuestionIndex}
@@ -352,39 +385,12 @@ export default function RankingView({
                                     />
                                 </div>
                             </div>
-                            {answerRevealed && <AnswerPhoto src={revealedPhoto} alt={revealedName} />}
-                        </div>
-
-                        <div className="mt-4">
-                            <h3 className="heading-chip text-3xl font-black text-primary md:text-4xl">直近の結果</h3>
-                            {answerRevealed && recentResults.length > 0 ? (
-                                <ol className="mt-3 grid gap-x-10 gap-y-2 md:grid-cols-2">
-                                    {recentResults.map((row, index) => (
-                                        <li
-                                            key={row.name + index}
-                                            className="flex items-baseline justify-between gap-4 border-b-2 border-theme py-2"
-                                        >
-                                            <div className="flex min-w-0 items-baseline gap-4">
-                                                <span className="num w-12 flex-none text-right text-2xl font-bold text-subtle md:text-3xl">
-                                                    {index + 1}
-                                                </span>
-                                                <span className="truncate text-2xl font-black text-primary md:text-4xl">{row.name}</span>
-                                            </div>
-                                            <div className="flex flex-none items-baseline gap-6">
-                                                <span className="num text-xl font-bold text-subtle md:text-2xl">{fmtDistance(row.distanceKm)}</span>
-                                                <span className="num w-28 text-right text-3xl font-black text-primary md:text-4xl">
-                                                    {row.gained}
-                                                    <span className="ml-1 text-lg font-bold text-subtle">pt</span>
-                                                </span>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ol>
-                            ) : (
-                                <p className="mt-3 text-2xl text-muted md:text-3xl">
-                                    {isClosed ? "「答えを表示」を押すと距離と得点が出ます" : "回答受付中..."}
+                            <div className={`w-2/5 flex flex-col justify-center`}>
+                                <p className="mt-4 mb-12 text-center text-5xl font-black text-primary md:text-7xl">
+                                    {revealedName}
                                 </p>
-                            )}
+                                {answerRevealed && <AnswerPhoto src={revealedPhoto} alt={revealedName} />}
+                            </div>
                         </div>
                     </>
                 )}

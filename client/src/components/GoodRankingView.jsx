@@ -23,29 +23,6 @@ function Avatar({ src, alt, sizeClass, color, show }) {
 const rateOf = (stat) =>
     stat && stat.participantCount > 0 ? (stat.goodCount / stat.participantCount) * 100 : 0;
 
-function Header({ title, socketReady, badge }) {
-    return (
-        <div className="flex flex-wrap items-end justify-between gap-4 border-b-4 border-[var(--expo-black)] pb-3">
-            <div>
-                <p className="heading-chip text-sm font-bold uppercase tracking-[0.22em] text-subtle">GOD TALENT</p>
-                <h2 className="mt-1 text-4xl font-black text-primary md:text-5xl">{title}</h2>
-            </div>
-            <div className="flex items-center gap-3 pb-2">
-                {badge && (
-                    <span className="rounded-full border-2 border-theme px-5 py-1.5 text-lg font-bold text-primary md:text-xl">
-                        {badge}
-                    </span>
-                )}
-                <span
-                    className={`h-4 w-4 rounded-full ${socketReady ? "bg-[var(--expo-blue)]" : "bg-[var(--expo-red)]"}`}
-                    title={socketReady ? "接続済み" : "接続中..."}
-                    aria-label={socketReady ? "接続済み" : "接続中..."}
-                />
-            </div>
-        </div>
-    );
-}
-
 // 順位の色：1位=赤 / 2位=青 / 3位=黄 / それ以下=黒
 const rankColor = (p) =>
     p === 1 ? "var(--expo-red)" : p === 2 ? "var(--expo-blue)" : p === 3 ? "var(--expo-yellow)" : "var(--expo-black)";
@@ -82,19 +59,13 @@ export default function GoodRankingView({ performers, stats, currentIndex, phase
         return (
             <main className="page-shell min-h-screen p-4 pt-6 md:p-8 md:pt-12">
                 <div className="mx-auto max-w-[1300px]">
-                    <Header
-                        title={isRecap ? "最終結果" : "ランキング発表"}
-                        socketReady={socketReady}
-                        badge="Good率"
-                    />
-
                     {/* 表彰台：2位(左) / 1位(中央) / 3位(右) */}
-                    <div className="mt-10 grid grid-cols-3 items-end gap-3 md:mt-14 md:gap-8">
+                    <div className="grid grid-cols-3 items-end gap-3 mt-4 md:gap-40">
                         {podium.map(({ row, p }) => {
                             const color = rankColor(p);
                             const revealed = Boolean(row) && isRevealed(p);
                             const sizeClass =
-                                p === 1 ? "h-40 w-40 md:h-60 md:w-60" : "h-28 w-28 md:h-44 md:w-44";
+                                p === 1 ? "h-40 w-40 md:h-100 md:w-100" : "h-28 w-28 md:h-84 md:w-84";
                             const lift = p === 1 ? "mb-6 md:mb-14" : p === 2 ? "mb-2 md:mb-6" : "";
                             return (
                                 <div key={p} className={`flex flex-col items-center ${lift}`}>
@@ -111,7 +82,7 @@ export default function GoodRankingView({ performers, stats, currentIndex, phase
                                         />
                                     </div>
                                     {revealed ? (
-                                        <p className="mt-3 text-center text-2xl font-black text-primary md:text-4xl">
+                                        <p className="mt-6 text-center text-2xl font-black text-primary md:text-5xl">
                                             <span className="num" style={{ color }}>
                                                 {Math.round(row.rate)}%
                                             </span>{" "}
@@ -126,7 +97,7 @@ export default function GoodRankingView({ performers, stats, currentIndex, phase
                     </div>
 
                     {/* 4位・5位：横長バー */}
-                    <div className="mx-auto mt-8 max-w-3xl space-y-3 md:mt-10">
+                    <div className="mx-auto max-w-5xl space-y-3 mt-14">
                         {bars.map((row, i) => {
                             const p = i + 4;
                             const color = rankColor(p);
@@ -134,16 +105,16 @@ export default function GoodRankingView({ performers, stats, currentIndex, phase
                             return (
                                 <div
                                     key={row?.performer.id ?? p}
-                                    className="bg-card flex items-center gap-4 rounded-2xl border-2 px-5 py-3 md:px-8"
+                                    className={`${i===0 && 'mb-8'} bg-card flex items-center gap-8 rounded-4xl border-2 px-5 py-3 md:px-8`}
                                     style={{ borderColor: revealed ? color : "var(--border-color)" }}
                                 >
-                                    <span className="num w-10 flex-none text-4xl font-black md:text-5xl" style={{ color }}>
+                                    <span className="num w-10 flex-none text-4xl font-black md:text-6xl" style={{ color }}>
                                         {p}
                                     </span>
                                     <Avatar
                                         src={revealed ? row.performer.photo : null}
                                         alt={revealed ? row.performer.name : ""}
-                                        sizeClass="h-14 w-14 md:h-16 md:w-16"
+                                        sizeClass="h-14 w-14 md:h-28 md:w-28"
                                         color={revealed ? color : "var(--border-color)"}
                                         show={revealed}
                                     />

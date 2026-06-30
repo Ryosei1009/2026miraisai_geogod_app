@@ -601,9 +601,6 @@ export default function App() {
             <ExpoShell socketReady={socketReady} showQr={!wantsAdmin}>
                 <main className={`page-shell min-h-screen p-4 md:p-10`}>
                     <section className="glass-card doc-card mx-auto mt-14 max-w-xl p-8">
-                        <p className="heading-chip text-xs font-bold uppercase tracking-[0.18em] text-subtle">
-                            {wantsAdmin ? "STAFF GATE" : mode === "good" ? "PAVILION 02" : "PAVILION 01"}
-                        </p>
                         <h1 className="mt-3 text-3xl font-black text-primary">{mode === "good" ? "ゴッドタレント" : "ジオゲッサー"}</h1>
                         <p className="mt-2 text-sm text-muted">司会者の指示に従ってください。</p>
 
@@ -664,14 +661,7 @@ export default function App() {
     if (isRankView) {
         return (
             <ExpoShell socketReady={socketReady}>
-                {!isAdmin ? (
-                    <main className="page-shell min-h-screen p-4 md:p-10">
-                        <section className="glass-card doc-card mx-auto mt-14 max-w-xl p-8">
-                            <h1 className="heading-chip mt-2 text-2xl font-extrabold text-primary">ランキング</h1>
-                            <p className="mt-3 text-muted">このページは運営のみ閲覧できます。</p>
-                        </section>
-                    </main>
-                ) : mode === "good" ? (
+                {mode === "good" ? (
                     <GoodRankingView
                         performers={performers}
                         stats={stats}
@@ -697,6 +687,7 @@ export default function App() {
                         announcement={gameState.announcement || null}
                         revealStep={gameState.revealStep || 0}
                         answerRevealed={Boolean(gameState.answerRevealed)}
+                        rankingRevealed={Boolean(gameState.rankingRevealed)}
                         recentResults={gameState.recentResults || []}
                     />
                 )}
@@ -772,6 +763,14 @@ export default function App() {
                         confirmAndSend(
                             "答えを表示します。よろしいですか？",
                             { type: "admin:revealAnswer" },
+                            "表示する",
+                            "やめる"
+                        )
+                    }
+                    onRevealRanking={() =>
+                        confirmAndSend(
+                            "この問題のランキングを表示します。よろしいですか？",
+                            { type: "admin:revealRanking" },
                             "表示する",
                             "やめる"
                         )

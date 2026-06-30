@@ -149,7 +149,9 @@ const geoState = {
   finalRankingVisible: false,
   // 締切後、運営が「答えを表示」を押すと true（結果マップ＝ピン・正解を公開）
   answerRevealed: false,
-  // カテゴリ最終問題の答え表示後、運営が「ランキング発表へ」を押すと true（段階発表に入る）
+  // 答え表示後、運営が「その問題のランキングを表示」を押すと true（今回の順位を公開）
+  rankingRevealed: false,
+  // カテゴリ最終問題のランキング表示後、運営が「ランキング発表へ」を押すと true（段階発表に入る）
   announcementActive: false,
   // ランキング発表（3位→2位→1位）の公開済み件数。0=非表示, 3=全公開
   revealStep: 0
@@ -265,17 +267,17 @@ function currentAnnouncement() {
   return null;
 }
 
-// 答え表示後にカテゴリ最終問題なら「ランキング発表へ」ボタンを出せるか
+// その問題のランキング表示後にカテゴリ最終問題なら「ランキング発表へ」ボタンを出せるか
 function canShowRanking() {
-  if (!geoState.answerRevealed) return false;
+  if (!geoState.rankingRevealed) return false;
   if (geoState.phase === "finished") return true;
   return geoState.phase === "closed" && geoState.currentQuestionIndex === LAST_JAPAN_INDEX;
 }
 
-// 直近に締め切った問題の、参加者ごとの距離と得点（ランキング画面で答え表示後に出す）。
-// 今回の得点が高い順。答え表示前は空配列。
+// 直近に締め切った問題の、参加者ごとの距離と得点（その問題のランキング表示後に出す）。
+// 今回の得点が高い順。ランキング表示前は空配列。
 function buildRecentResults() {
-  if (!geoState.answerRevealed) return [];
+  if (!geoState.rankingRevealed) return [];
   if (geoState.phase !== "closed" && geoState.phase !== "finished") return [];
   const q = questions[geoState.currentQuestionIndex];
   return getAllParticipants()
@@ -309,9 +311,11 @@ function buildGeoBase() {
     // ランキング発表の場面と、公開済み順位数（クライアントが段階表示に使う）
     announcement: currentAnnouncement(),
     revealStep: geoState.revealStep,
-    // 締切後に運営が「答えを表示」を押したか。結果マップ・直近結果の公開可否に使う
+    // 締切後に運営が「答えを表示」を押したか。結果マップ・正解の公開可否に使う
     answerRevealed: geoState.answerRevealed,
-    // 答え表示後にカテゴリ最終問題なら「ランキング発表へ」ボタンを出せる
+    // 答え表示後に運営が「その問題のランキングを表示」を押したか。直近結果の公開可否に使う
+    rankingRevealed: geoState.rankingRevealed,
+    // その問題のランキング表示後にカテゴリ最終問題なら「ランキング発表へ」ボタンを出せる
     canShowRanking: canShowRanking(),
     // 正解は「答えを表示」後にのみ公開する
     revealedAnswer:
@@ -614,6 +618,7 @@ function handleAdminGeoMessage(msg) {
     geoState.phase = isLast ? "finished" : "closed";
     // 締切直後は答え非公開。運営が「答えを表示」を押すまで結果マップ・直近結果は出さない
     geoState.answerRevealed = false;
+    geoState.rankingRevealed = false;
     geoState.announcementActive = false;
     geoState.revealStep = 0;
 
@@ -627,15 +632,34 @@ function handleAdminGeoMessage(msg) {
     return true;
   }
 
-  // 締切後、運営が「答えを表示」を押すと正解・全員のピンを公開する
+  // 締切後、運営が「答えを表示」を押すと正解・全員のピンを公開し、
+  // 同時に保留していた今回の得点を合計スコアへ加算する
   if (msg.type === "admin:revealAnswer") {
     if (geoState.phase !== "closed" && geoState.phase !== "finished") return true;
+    if (geoState.answerRevealed) return true; // 二重加算防止
     geoState.answerRevealed = true;
+    const roundResults = applyPendingResults();
+
+    // 加算後の確定結果を管理者へ再送（直近問題の集計を最新化）
+    for (const [clientWs, clientMeta] of clients.entries()) {
+      if (clientMeta.role === "admin") {
+        send(clientWs, { type: "roundResult", payload: roundResults });
+      }
+    }
     broadcastState();
     return true;
   }
 
-  // 答え表示後、カテゴリ最終問題なら「ランキング発表へ」で段階発表に入る
+  // 答え表示後、運営が「その問題のランキングを表示」を押すと今回の順位を公開する
+  if (msg.type === "admin:revealRanking") {
+    if (geoState.phase !== "closed" && geoState.phase !== "finished") return true;
+    if (!geoState.answerRevealed) return true;
+    geoState.rankingRevealed = true;
+    broadcastState();
+    return true;
+  }
+
+  // その問題のランキング表示後、カテゴリ最終問題なら「ランキング発表へ」で段階発表に入る
   if (msg.type === "admin:showRanking") {
     if (!canShowRanking()) return true;
     geoState.announcementActive = true;
@@ -647,9 +671,12 @@ function handleAdminGeoMessage(msg) {
   if (msg.type === "admin:next") {
     if (geoState.phase !== "closed") return true;
     if (geoState.currentQuestionIndex >= questions.length - 1) return true;
+    // フロー強制：答え→その問題のランキング表示まで進めてから次の問題へ
+    if (!geoState.rankingRevealed) return true;
     geoState.currentQuestionIndex += 1;
     geoState.phase = "active";
     geoState.answerRevealed = false;
+    geoState.rankingRevealed = false;
     geoState.announcementActive = false;
     geoState.revealStep = 0;
     clearCurrentPins();
@@ -693,6 +720,7 @@ function handleAdminJumpMessage(msg) {
       geoState.phase = "active";
       geoState.finalRankingVisible = false;
       geoState.answerRevealed = false;
+      geoState.rankingRevealed = false;
       geoState.announcementActive = false;
       geoState.revealStep = 0;
       clearCurrentPins();
@@ -882,6 +910,9 @@ function handleGoodVote(meta, msg) {
   return true;
 }
 
+// 締切時：各参加者の今回の距離・得点を算出して「保留（pendingRound）」に置くだけ。
+// 合計スコアへの加算は「答えを表示」(applyPendingResults) まで行わない。
+// 返す表は運営確認用で、合計は加算後の見込み値（現在の合計＋今回得点）。
 function closeCurrentQuestionAndScore() {
   const q = questions[geoState.currentQuestionIndex];
   const resultRows = [];
@@ -899,18 +930,45 @@ function closeCurrentQuestionAndScore() {
       gained = distanceKm <= toleranceKm ? scoreFromDistance(distanceKm, qCategory) : 0;
     }
 
-    participant.scores[qCategory] += gained;
-    participant.lastRound = {
-      questionId: q.id,
-      gained,
-      distanceKm
-    };
+    // まだ加算しない。答え発表時に確定させるため保留する
+    participant.pendingRound = { questionId: q.id, category: qCategory, gained, distanceKm };
     participant.currentPin = null;
 
     resultRows.push({
       name,
       gained,
       distanceKm,
+      // 加算前なので見込みの合計（実際の加算は答え発表時）
+      totalScore: totalScore(scores) + gained
+    });
+  }
+
+  return resultRows.sort((a, b) => b.totalScore - a.totalScore);
+}
+
+// 答え発表時：保留していた今回の得点を合計に加算し、lastRound を確定する。
+// 二重加算を防ぐため、適用後は pendingRound を消す（再実行しても安全）。
+function applyPendingResults() {
+  const q = questions[geoState.currentQuestionIndex];
+  const resultRows = [];
+
+  for (const participant of getAllParticipants()) {
+    const pending = participant.pendingRound;
+    if (pending && pending.questionId === q.id) {
+      participant.scores[pending.category] += pending.gained;
+      participant.lastRound = {
+        questionId: q.id,
+        gained: pending.gained,
+        distanceKm: pending.distanceKm
+      };
+      participant.pendingRound = null;
+    }
+
+    const isCurrent = participant.lastRound && participant.lastRound.questionId === q.id;
+    resultRows.push({
+      name: participant.name,
+      gained: isCurrent ? participant.lastRound.gained : 0,
+      distanceKm: isCurrent ? participant.lastRound.distanceKm : null,
       totalScore: totalScore(participant.scores)
     });
   }
@@ -921,6 +979,8 @@ function closeCurrentQuestionAndScore() {
 function clearCurrentPins() {
   for (const meta of getAllParticipants()) {
     meta.currentPin = null;
+    // 未加算の保留結果が次問へ持ち越されて誤適用されないようにクリア
+    meta.pendingRound = null;
   }
 }
 
@@ -937,6 +997,7 @@ function resetGeoGame({ forceRejoin = false } = {}) {
   geoState.currentQuestionIndex = 0;
   geoState.finalRankingVisible = false;
   geoState.answerRevealed = false;
+  geoState.rankingRevealed = false;
   geoState.announcementActive = false;
   geoState.revealStep = 0;
   if (forceRejoin) {
@@ -947,6 +1008,7 @@ function resetGeoGame({ forceRejoin = false } = {}) {
     meta.scores = blankScores();
     meta.answers = {};
     meta.lastRound = null;
+    meta.pendingRound = null;
     meta.currentPin = null;
     if (forceRejoin) {
       meta.role = "guest";
@@ -986,6 +1048,7 @@ if (useHttps) {
 // CLIENT_ORIGIN 設定時のみ Origin を検証する（CSWSH対策）。
 // 未設定時は全許可（設定ミスによる当日の全断を避けるための安全弁）。
 function isOriginAllowed(origin) {
+  if (process.env.IS_DEBUG) return true;
   if (!CLIENT_ORIGIN) return true;
   return origin === CLIENT_ORIGIN.replace(/\/$/, "");
 }

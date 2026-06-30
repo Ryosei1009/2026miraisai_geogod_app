@@ -128,12 +128,12 @@ export default function GeoPlayerView({ phase, player, currentCategory, currentQ
                             {error && <p className="alert-error rounded-lg p-2 text-sm">{error}</p>}
                             <div className="glass-card doc-card bg-card/95 p-3 shadow-lg backdrop-blur md:p-4">
                                 <div className="mt-1 flex md:mt-2">
-                                    <div className="w-2/3">
-                                        <p className="heading-chip text-[11px] uppercase tracking-widest text-muted">参加者</p>
+                                    <div className="w-7/12">
+                                        <p className="heading-chip text-[11px] uppercase tracking-widest text-muted">プレイヤー名</p>
                                         <h2 className="text-xl font-extrabold text-primary md:text-2xl">{player?.name || "-"}</h2>
                                     </div>
-                                    <div className="w-1/3">
-                                        <p className="text-[11px] uppercase tracking-widest text-muted">{activeLabel}スコア</p>
+                                    <div className="w-5/12">
+                                        <p className="heading-chip text-[11px] uppercase tracking-widest text-muted">{activeLabel}合計スコア</p>
                                         <p className="num -mt-1 text-3xl font-extrabold text-accent md:text-4xl">{activeScore}</p>
                                     </div>
                                 </div>
@@ -153,10 +153,8 @@ export default function GeoPlayerView({ phase, player, currentCategory, currentQ
 
                     {phase === "waiting" && (
                         <div className="pointer-events-auto mx-auto w-full max-w-xl p-2 md:pb-0">
-                            <div className="glass-card doc-card bg-card/95 p-6 text-center shadow-lg backdrop-blur">
-                                <p className="heading-chip justify-center text-xs font-bold uppercase tracking-[0.18em] text-subtle">PAVILION 01</p>
-                                <h3 className="mt-2 text-3xl font-extrabold text-primary">開始待機中</h3>
-                                <p className="mt-3 text-muted">運営がゲーム開始を押すまでお待ちください。</p>
+                            <div className="glass-card doc-card bg-card/95 py-10 text-center shadow-lg backdrop-blur">
+                                <h3 className="text-3xl font-extrabold text-primary">開始待機中</h3>
                             </div>
                         </div>
                     )}

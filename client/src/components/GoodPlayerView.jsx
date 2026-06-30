@@ -41,7 +41,6 @@ export default function GoodPlayerView({
 
                 {isWaiting && (
                     <div className="glass-card doc-card w-full max-w-md p-8 text-center">
-                        <p className="heading-chip justify-center text-xs font-bold uppercase tracking-[0.18em] text-subtle">PAVILION 02</p>
                         <h1 className="mt-3 text-2xl font-black text-primary sm:text-3xl">ゴッドタレント</h1>
                         <p className="mt-2 text-sm text-muted">企画開始までお待ちください。</p>
                         <p className="mt-4 text-xs text-subtle">接続状態: {socketReady ? "接続済み" : "接続中..."}</p>
