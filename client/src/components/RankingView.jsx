@@ -239,12 +239,15 @@ export default function RankingView({
 
     return (
         <main className="page-shell min-h-screen p-4 pt-6 md:p-8 md:pt-12">
-            <div className="mx-auto max-w-[1800px]">
+            <div>
                 {isAnnouncement ? (
                     ranking.length === 0 ? (
                         <p className="mt-12 text-4xl text-muted">現在のランキングはありません。</p>
                     ) : (
                       <>
+                        <p className="heading-chips text-center text-2xl font-black text-primary md:text-7xl">
+                            ランキング
+                        </p>
                         <div className="mt-10 grid items-end gap-5 md:grid-cols-3">
                             {podiumOrder.map((rankIndex) => {
                                 const row = topThree[rankIndex];
@@ -280,7 +283,7 @@ export default function RankingView({
                                         className={`bg-card rounded-2xl border-2 border-theme p-5 md:px-7 ${padBottom}`}
                                         style={{ borderTop: `12px solid ${podium.color}` }}
                                     >
-                                        <div className="flex min-w-0 items-baseline gap-4">
+                                        <div className="flex min-w-0 items-baseline gap-8">
                                             <span className="num text-6xl font-black md:text-7xl" style={{ color: podium.color }}>
                                                 {rankIndex + 1}
                                             </span>
@@ -295,26 +298,38 @@ export default function RankingView({
                             })}
                         </div>
 
-                        {/* 1位発表（revealStep=3）と同時に 4〜8位を表彰台の下に表示 */}
-                        {revealStep >= 3 && rest4to8.length > 0 && (
-                            <ol className="mt-6 flex flex-col gap-y-4 mx-auto max-w-5xl">
-                                {rest4to8.map((row, index) => (
-                                    <li
-                                        key={row.name + index}
-                                        className="flex items-baseline justify-between gap-4 border-b-2 border-theme pb-1 pt-2 px-6"
-                                    >
-                                        <div className="flex min-w-0 items-baseline gap-4">
-                                            <span className="num w-12 flex-none text-right text-2xl font-bold text-subtle md:text-6xl">
-                                                {index + 4}
-                                            </span>
-                                            <span className="truncate text-2xl font-black text-primary md:text-6xl">{row.name}</span>
-                                        </div>
-                                        <span className="num flex-none text-2xl font-black text-primary md:text-6xl">
-                                            {getScoreValue(row)}
-                                            <span className="ml-2 text-lg font-bold text-subtle">pt</span>
-                                        </span>
-                                    </li>
-                                ))}
+                        {/* 4〜8位は発表中ずっと表示。1位発表（revealStep=3）まではシルエット（？）、
+                            1位発表と同時に実名・得点を公開する。 */}
+                        {rest4to8.length > 0 && (
+                            <ol className="mt-8 flex flex-col gap-y-8 mx-auto max-w-5xl">
+                                {rest4to8.map((row, index) => {
+                                    const revealed4to8 = revealStep >= 3;
+                                    return (
+                                        <li
+                                            key={row.name + index}
+                                            className="flex items-baseline justify-between gap-4 border-b-2 border-theme pb-1 pt-2 px-6"
+                                        >
+                                            <div className="flex min-w-0 items-baseline gap-4">
+                                                <span className="num w-12 flex-none text-right text-2xl font-bold text-subtle md:text-6xl">
+                                                    {index + 4}
+                                                </span>
+                                                {revealed4to8 ? (
+                                                    <span className="truncate text-2xl font-black text-primary md:text-6xl">{row.name}</span>
+                                                ) : (
+                                                    <span className="text-2xl font-black text-subtle md:text-6xl">？</span>
+                                                )}
+                                            </div>
+                                            {revealed4to8 ? (
+                                                <span className="num flex-none text-2xl font-black text-primary md:text-6xl">
+                                                    {getScoreValue(row)}
+                                                    <span className="ml-2 text-lg font-bold text-subtle">pt</span>
+                                                </span>
+                                            ) : (
+                                                <span className="num flex-none text-2xl font-black text-subtle md:text-6xl">？</span>
+                                            )}
+                                        </li>
+                                    );
+                                })}
                             </ol>
                         )}
                       </>

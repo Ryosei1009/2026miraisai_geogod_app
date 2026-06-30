@@ -610,7 +610,7 @@ export default function App() {
                                 <input
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
-                                    maxLength={24}
+                                    maxLength={7}
                                     className="input-field mt-2 w-full px-4 py-3 outline-none ring-0 transition"
                                 />
                             </div>
