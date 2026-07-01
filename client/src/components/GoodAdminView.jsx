@@ -1,55 +1,3 @@
-import { useEffect, useRef, useState } from "react";
-
-// 白背景で見える4色（白は除外）。使用色は赤・青・黄・黒・白のみ。
-const EXPO_COLORS = ["#e60012", "#f6c800", "#0068b7", "#16161a"];
-
-// 投票ドット演出：1票 = 1人の「色」。投票が入るたびにドットが降ってきて
-// 画面の下に積もる（個性が集まって作品になる）。出演者が変わるとリセット。
-function VoteDotLayer({ count, resetKey }) {
-    const [dots, setDots] = useState([]);
-    const prevCountRef = useRef(0);
-    const idRef = useRef(0);
-
-    useEffect(() => {
-        setDots([]);
-        prevCountRef.current = 0;
-    }, [resetKey]);
-
-    useEffect(() => {
-        const prev = prevCountRef.current;
-        if (count > prev) {
-            // 一度に大量に来てもDOMが膨れないよう1回の追加は30個まで
-            const added = Math.min(count - prev, 30);
-            const fresh = Array.from({ length: added }, () => ({
-                id: idRef.current++,
-                left: 2 + Math.random() * 96,
-                color: EXPO_COLORS[Math.floor(Math.random() * EXPO_COLORS.length)],
-                rest: 8 + Math.random() * 56,
-                delay: Math.random() * 0.3
-            }));
-            setDots((current) => [...current, ...fresh].slice(-400));
-        }
-        prevCountRef.current = count;
-    }, [count]);
-
-    return (
-        <div className="vote-dot-layer" aria-hidden="true">
-            {dots.map((dot) => (
-                <span
-                    key={dot.id}
-                    className="vote-dot"
-                    style={{
-                        left: `${dot.left}%`,
-                        background: dot.color,
-                        animationDelay: `${dot.delay}s`,
-                        "--fall-distance": `calc(100vh - ${dot.rest.toFixed(0)}px)`
-                    }}
-                />
-            ))}
-        </div>
-    );
-}
-
 export default function GoodAdminView({
     mode,
     onSwitchMode,
@@ -108,10 +56,6 @@ export default function GoodAdminView({
 
     return (
         <main className="page-shell min-h-screen p-3 pt-6 md:p-6 md:pt-8">
-            {phase === "live" && (
-                <VoteDotLayer count={currentStat?.goodCount ?? 0} resetKey={currentIndex} />
-            )}
-
             <div className="mx-auto grid max-w-7xl grid-cols-1 gap-4 lg:grid-cols-12">
                 <section className="glass-card doc-card p-5 lg:col-span-4">
                     <div className="mb-4 flex flex-wrap gap-2">
