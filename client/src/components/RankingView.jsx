@@ -61,15 +61,29 @@ function ResultMap({ phase, currentQuestionIndex, currentCategory, revealedAnswe
         region: "JP"
     });
 
+    // 各自の回答ピン（青丸）。従来 scale7 → 2.5倍の 17.5 に拡大。
     const participantPinIcon = useMemo(() => {
         if (!isLoaded || !window.google?.maps) return undefined;
         return {
             path: window.google.maps.SymbolPath.CIRCLE,
-            scale: 7,
+            scale: 17.5,
             fillColor: "#0068b7",
             fillOpacity: 0.9,
             strokeColor: "#ffffff",
-            strokeWeight: 2
+            strokeWeight: 3
+        };
+    }, [isLoaded]);
+
+    // 正解ピン（赤）。各自ピンより大きく（約4倍相当）目立たせる。
+    const answerPinIcon = useMemo(() => {
+        if (!isLoaded || !window.google?.maps) return undefined;
+        return {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 28,
+            fillColor: "#e60012",
+            fillOpacity: 1,
+            strokeColor: "#ffffff",
+            strokeWeight: 4
         };
     }, [isLoaded]);
 
@@ -168,7 +182,7 @@ function ResultMap({ phase, currentQuestionIndex, currentCategory, revealedAnswe
                         title={pin.name}
                     />
                 ))}
-            {showPins && revealedAnswer && <MarkerF position={revealedAnswer} zIndex={1000} />}
+            {showPins && revealedAnswer && <MarkerF position={revealedAnswer} icon={answerPinIcon} zIndex={1000} />}
         </GoogleMap>
     );
 }
@@ -224,12 +238,21 @@ export default function RankingView({
     const topThree = sortedRanking.slice(0, 3);
     // 4〜8位（1位発表と同時に表彰台の下へ出す）
     const rest4to8 = sortedRanking.slice(3, 8);
+    // その問題のランキング用：今回の得点・距離（recentResults は今回得点の高い順でサーバーから届く）
+    const recentTop3 = recentResults.slice(0, 3);
     // 表彰台の並び：左=2位, 中央=1位, 右=3位（中央を高く見せる）
     const podiumOrder = [1, 0, 2];
 
     // 発表場面では revealStep に応じて段階公開。
-    // 3位(rankIndex2)→2位(rankIndex1)→1位(rankIndex0) の順に出す。
-    const isRevealed = (rankIndex) => !isAnnouncement || 2 - rankIndex < revealStep;
+    // 順番：3位(step1)→2位(step2)→4〜8位(step3)→1位(step4)。
+    const isRevealed = (rankIndex) => {
+        if (!isAnnouncement) return true;
+        if (rankIndex === 2) return revealStep >= 1; // 3位
+        if (rankIndex === 1) return revealStep >= 2; // 2位
+        return revealStep >= 4; // 1位
+    };
+    // 4〜8位は step3 で公開（1位より先）
+    const revealed4to8 = revealStep >= 3;
 
     const isClosed = phase === "closed" || phase === "finished";
     const fmtDistance = (km) => {
@@ -287,7 +310,7 @@ export default function RankingView({
                                             <span className="num text-6xl font-black md:text-7xl" style={{ color: podium.color }}>
                                                 {rankIndex + 1}
                                             </span>
-                                            <span className="truncate text-4xl font-black text-primary md:text-6xl">{row.name}</span>
+                                            <span className="truncate pb-2 text-4xl font-black leading-tight text-primary md:text-6xl">{row.name}</span>
                                         </div>
                                         <p className="num mt-3 text-7xl font-black text-primary md:text-8xl">
                                             {getScoreValue(row)}
@@ -298,12 +321,10 @@ export default function RankingView({
                             })}
                         </div>
 
-                        {/* 4〜8位は発表中ずっと表示。1位発表（revealStep=3）まではシルエット（？）、
-                            1位発表と同時に実名・得点を公開する。 */}
+                        {/* 4〜8位は発表中ずっと表示。step3 でシルエット（？）→実名・得点を公開（1位より先）。 */}
                         {rest4to8.length > 0 && (
                             <ol className="mt-8 flex flex-col gap-y-8 mx-auto max-w-5xl">
                                 {rest4to8.map((row, index) => {
-                                    const revealed4to8 = revealStep >= 3;
                                     return (
                                         <li
                                             key={row.name + index}
@@ -314,7 +335,7 @@ export default function RankingView({
                                                     {index + 4}
                                                 </span>
                                                 {revealed4to8 ? (
-                                                    <span className="truncate text-2xl font-black text-primary md:text-6xl">{row.name}</span>
+                                                    <span className="truncate pb-2 text-2xl font-black leading-tight text-primary md:text-6xl">{row.name}</span>
                                                 ) : (
                                                     <span className="text-2xl font-black text-subtle md:text-6xl">？</span>
                                                 )}
@@ -336,16 +357,16 @@ export default function RankingView({
                     )
                 ) : rankingRevealed ? (
                     <>
-                        {/* その問題のランキング：日本/世界/総合と同じ表彰台（上位3名）＋結果マップ */}
+                        {/* その問題のランキング：今回の得点による表彰台（上位3名）＋距離＋結果マップ */}
                         <p className="heading-chips text-center text-2xl font-black text-primary md:text-7xl">
-                            ランキング
+                            この問題のランキング
                         </p>
-                        {ranking.length === 0 ? (
-                            <p className="mt-10 text-4xl text-muted">現在のランキングはありません。</p>
+                        {recentTop3.length === 0 ? (
+                            <p className="mt-10 text-4xl text-muted">回答者がいませんでした。</p>
                         ) : (
                             <div className="mt-12 grid items-end gap-5 md:grid-cols-3">
                                 {podiumOrder.map((rankIndex) => {
-                                    const row = topThree[rankIndex];
+                                    const row = recentTop3[rankIndex];
                                     if (!row) return null;
                                     const podium = PODIUM[rankIndex];
                                     const padBottom =
@@ -360,11 +381,14 @@ export default function RankingView({
                                                 <span className="num text-5xl font-black md:text-6xl" style={{ color: podium.color }}>
                                                     {rankIndex + 1}
                                                 </span>
-                                                <span className="truncate text-3xl font-black text-primary md:text-5xl">{row.name}</span>
+                                                <span className="truncate pb-2 text-3xl font-black leading-tight text-primary md:text-5xl">{row.name}</span>
                                             </div>
                                             <p className="num mt-3 text-6xl font-black text-primary md:text-7xl">
-                                                {getScoreValue(row)}
+                                                {row.gained}
                                                 <span className="ml-3 text-2xl font-bold text-subtle">pt</span>
+                                            </p>
+                                            <p className="num mt-1 text-2xl font-bold text-subtle md:text-3xl">
+                                                正解まで {fmtDistance(row.distanceKm)}
                                             </p>
                                         </div>
                                     );

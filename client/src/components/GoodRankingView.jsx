@@ -142,12 +142,6 @@ export default function GoodRankingView({ performers, stats, currentIndex, phase
     return (
         <main className="page-shell min-h-screen p-4 pt-6 md:p-8 md:pt-20">
             <div className="mx-auto max-w-[1500px]">
-                <Header
-                    title="ゴッドタレント"
-                    socketReady={socketReady}
-                    badge={phase === "live" ? "投票受付中" : phase === "review" ? "結果発表" : "待機中"}
-                />
-
                 {phase === "waiting" && (
                     <div className="bg-card mt-6 rounded-2xl border-2 border-theme p-10 text-center">
                         <p className="text-3xl font-black text-primary md:text-4xl">企画開始までお待ちください</p>

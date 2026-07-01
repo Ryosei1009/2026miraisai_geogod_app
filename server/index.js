@@ -697,10 +697,10 @@ function handleAdminGeoMessage(msg) {
     return true;
   }
 
-  // ランキング発表を1つ進める / 戻す（3位→2位→1位）。発表場面のときのみ有効
+  // ランキング発表を1つ進める / 戻す（3位→2位→4〜8位→1位の4段階）。発表場面のときのみ有効
   if (msg.type === "admin:revealNext") {
     if (!currentAnnouncement()) return true;
-    if (geoState.revealStep < 3) geoState.revealStep += 1;
+    if (geoState.revealStep < 4) geoState.revealStep += 1;
     broadcastState();
     return true;
   }

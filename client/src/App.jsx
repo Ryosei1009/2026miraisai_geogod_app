@@ -103,6 +103,12 @@ export default function App() {
     const [gameState, setGameState] = useState(buildInitialGameState);
     const [roundResult, setRoundResult] = useState([]);
     const [error, setError] = useState("");
+    // エラーメッセージ（例：「現在は回答を受け付けていません。」）は一定時間で自動的に消す
+    useEffect(() => {
+        if (!error) return undefined;
+        const timer = setTimeout(() => setError(""), 4000);
+        return () => clearTimeout(timer);
+    }, [error]);
     const [confirmState, setConfirmState] = useState({
         open: false,
         title: "",
@@ -177,13 +183,26 @@ export default function App() {
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
-        if (params.get("admin") === "1") {
+        const isAdminUrl = params.get("admin") === "1";
+        if (isAdminUrl) {
             setShowAdminPanel(true);
             setWantsAdmin(true);
         }
 
-        // WebSocket接続開始
-        connectWebSocket();
+        // WebSocket接続開始。
+        // 大人数が同時にページを開くと初回接続のTLSハンドシェイクが一瞬に集中し、
+        // サーバー（Node直TLS）のイベントループが詰まる。参加者は初回接続を
+        // 0〜4秒ランダムに遅延させて平準化する（運営・ランキング画面は即時接続）。
+        let initialConnectTimer = null;
+        const staggerMs = isAdminUrl || isRankView ? 0 : Math.random() * 4000;
+        if (staggerMs > 0) {
+            initialConnectTimer = setTimeout(() => {
+                initialConnectTimer = null;
+                connectWebSocket();
+            }, staggerMs);
+        } else {
+            connectWebSocket();
+        }
 
         // バックグラウンド/フォアグラウンド遷移の検出
         const handleVisibilityChange = () => {
@@ -209,6 +228,7 @@ export default function App() {
         return () => {
             document.removeEventListener("visibilitychange", handleVisibilityChange);
             window.removeEventListener("online", handleOnline);
+            if (initialConnectTimer) clearTimeout(initialConnectTimer);
             clearReconnectTimeout();
             clearHeartbeatInterval();
             if (pinSendTimeoutRef.current) {
@@ -826,6 +846,7 @@ export default function App() {
                 canAnswer={canAnswer}
                 revealedAnswer={revealedAnswer}
                 answerRevealed={Boolean(gameState.answerRevealed)}
+                announcement={gameState.announcement || null}
                 performers={performers}
                 currentIndex={currentIndex}
                 stats={stats}

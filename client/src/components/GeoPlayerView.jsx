@@ -26,7 +26,7 @@ const mapOptions = {
     ]
 };
 
-export default function GeoPlayerView({ phase, player, currentCategory, currentQuestionIndex, playerAnswer, pin, onPick, canAnswer, revealedAnswer, answerRevealed = false, error, formatDistance }) {
+export default function GeoPlayerView({ phase, player, currentCategory, currentQuestionIndex, playerAnswer, pin, onPick, canAnswer, revealedAnswer, answerRevealed = false, announcement = null, error, formatDistance }) {
     const mapRef = useRef(null);
     const scoreBucket = player?.scores || { trial: 0, japan: 0, world: 0 };
     const scoreLabels = { trial: "お試し", japan: "日本", world: "世界" };
@@ -128,14 +128,17 @@ export default function GeoPlayerView({ phase, player, currentCategory, currentQ
                             {error && <p className="alert-error rounded-lg p-2 text-sm">{error}</p>}
                             <div className="glass-card doc-card bg-card/95 p-3 shadow-lg backdrop-blur md:p-4">
                                 <div className="mt-1 flex md:mt-2">
-                                    <div className="w-7/12">
+                                    <div className={announcement ? "w-full" : "w-7/12"}>
                                         <p className="heading-chip text-[11px] uppercase tracking-widest text-muted">プレイヤー名</p>
                                         <h2 className="text-xl font-extrabold text-primary md:text-2xl">{player?.name || "-"}</h2>
                                     </div>
-                                    <div className="w-5/12">
-                                        <p className="heading-chip text-[11px] uppercase tracking-widest text-muted">{activeLabel}合計スコア</p>
-                                        <p className="num -mt-1 text-3xl font-extrabold text-accent md:text-4xl">{activeScore}</p>
-                                    </div>
+                                    {/* 日本/世界/総合の発表中は合計スコアを伏せる（順位のネタバレ防止） */}
+                                    {!announcement && (
+                                        <div className="w-5/12">
+                                            <p className="heading-chip text-[11px] uppercase tracking-widest text-muted">{activeLabel}合計スコア</p>
+                                            <p className="num -mt-1 text-3xl font-extrabold text-accent md:text-4xl">{activeScore}</p>
+                                        </div>
+                                    )}
                                 </div>
                                 {showResult ? (
                                     <div className="num mt-3 grid grid-cols-2 gap-1 border-t border-theme pt-2 text-sm text-muted">
