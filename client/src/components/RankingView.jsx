@@ -105,7 +105,7 @@ function ResultMap({ phase, currentQuestionIndex, currentCategory, revealedAnswe
 
         const nearest = [...pins]
             .sort((a, b) => haversineKm(a, answer) - haversineKm(b, answer))
-            .slice(0, Math.max(1, Math.ceil(pins.length * 0.8)));
+            .slice(0, Math.max(1, Math.ceil(pins.length * 0.65)));
 
         const bounds = new window.google.maps.LatLngBounds();
         bounds.extend(answer);
