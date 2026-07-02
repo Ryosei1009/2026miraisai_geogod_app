@@ -114,20 +114,20 @@ let gameId = createGameId();
 // name = 答え発表で表示する正式名称、photo = 問題写真のパス（client/public/questions/ 配下）。
 // 写真が無い場合は答え発表画面側で自動的にプレースホルダ表示になる。
 const questions = [
-  { id: 1, title: "お試し: コクーンタワー", name: "コクーンタワー", photo: "/questions/q1.png", answer: { lat: 35.69114471011293, lng: 139.6983205878176 }, category: "trial" },
-  { id: 2, title: "日本1: 道頓堀", name: "道頓堀", photo: "/questions/q2.png", answer: { lat: 34.66912739831733, lng: 135.50098445951002 }, category: "japan" },
-  { id: 3, title: "日本2: 富士山", name: "富士山", photo: "/questions/q3.png", answer: { lat: 35.473995570936, lng: 138.57578272224853 }, category: "japan" },
-  { id: 4, title: "日本3: 東京スカイツリー", name: "東京スカイツリー", photo: "/questions/q4.png", answer: { lat: 35.708808302865535, lng: 139.79698745839036 }, category: "japan" },
-  { id: 5, title: "日本4: 伊丹空港", name: "伊丹空港", photo: "/questions/q5.png", answer: { lat: 34.7814503784298, lng: 135.43805198386664 }, category: "japan" },
-  { id: 6, title: "日本5: 女木島", name: "女木島", photo: "/questions/q6.png", answer: { lat: 34.39696096046623, lng: 134.05073420442565 }, category: "japan" },
-  { id: 7, title: "日本6: アドベンチャーワールド", name: "アドベンチャーワールド", photo: "/questions/q7.png", answer: { lat: 33.665559938251924, lng: 135.3728094558746 }, category: "japan" },
-  { id: 8, title: "日本7: 草津温泉", name: "草津温泉", photo: "/questions/q8.png", answer: { lat: 36.622710727117884, lng: 138.59674411577024 }, category: "japan" },
-  { id: 9, title: "世界1: 自由の女神", name: "自由の女神", photo: "/questions/q9.png", answer: { lat: 40.686672497253184, lng: -74.0422216486521 }, category: "world" },
-  { id: 10, title: "世界2: サグラダファミリア", name: "サグラダファミリア", photo: "/questions/q10.png", answer: { lat: 41.404482707594646, lng: 2.1757298975257253 }, category: "world" },
-  { id: 11, title: "世界3: ベネツィア", name: "ベネツィア", photo: "/questions/q11.png", answer: { lat: 45.43160787336232, lng: 12.328871577952329 }, category: "world" },
-  { id: 12, title: "世界4: イースター島", name: "イースター島", photo: "/questions/q12.png", answer: { lat: -27.115184894673423, lng: -109.3951422690066 }, category: "world" },
-  { id: 13, title: "世界5: コムローイ祭り", name: "コムローイ祭り", photo: "/questions/q13.png", answer: { lat: 18.76637382098111, lng: 99.24217092622294 }, category: "world" },
-  { id: 14, title: "世界5: マーライオン", name: "マーライオン", photo: "/questions/q14.png", answer: { lat: 1.2869628927656556, lng: 103.85443270584084 }, category: "world" }
+  { id: 1, title: "お試し: コクーンタワー", name: "新宿区<br/>コクーンタワー", photo: "/questions/q1.png", answer: { lat: 35.69114471011293, lng: 139.6983205878176 }, category: "trial" },
+  { id: 2, title: "日本1: 道頓堀", name: "なんば<br/>道頓堀", photo: "/questions/q2.png", answer: { lat: 34.66912739831733, lng: 135.50098445951002 }, category: "japan" },
+  { id: 3, title: "日本2: 富士山", name: "山梨県<br/>富士山", photo: "/questions/q3.png", answer: { lat: 35.473995570936, lng: 138.57578272224853 }, category: "japan" },
+  { id: 4, title: "日本3: 東京スカイツリー", name: "台東区(浅草)<br/>東京スカイツリー", photo: "/questions/q4.png", answer: { lat: 35.708808302865535, lng: 139.79698745839036 }, category: "japan" },
+  { id: 5, title: "日本4: 伊丹空港", name: "兵庫県<br/>伊丹空港", photo: "/questions/q5.png", answer: { lat: 34.7814503784298, lng: 135.43805198386664 }, category: "japan" },
+  { id: 6, title: "日本5: 女木島", name: "香川県<br/>女木島", photo: "/questions/q6.png", answer: { lat: 34.39696096046623, lng: 134.05073420442565 }, category: "japan" },
+  { id: 7, title: "日本6: アドベンチャーワールド", name: "和歌山県<br/>アドベンチャーワールド", photo: "/questions/q7.png", answer: { lat: 33.665559938251924, lng: 135.3728094558746 }, category: "japan" },
+  { id: 8, title: "日本7: 草津温泉", name: "群馬県<br/>草津温泉", photo: "/questions/q8.png", answer: { lat: 36.622710727117884, lng: 138.59674411577024 }, category: "japan" },
+  { id: 9, title: "世界1: 自由の女神", name: "ニューヨーク<br/>自由の女神", photo: "/questions/q9.png", answer: { lat: 40.686672497253184, lng: -74.0422216486521 }, category: "world" },
+  { id: 10, title: "世界2: サグラダファミリア", name: "スペイン<br/>サグラダファミリア", photo: "/questions/q10.png", answer: { lat: 41.404482707594646, lng: 2.1757298975257253 }, category: "world" },
+  { id: 11, title: "世界3: ベネツィア", name: "イタリア<br/>ベネツィア", photo: "/questions/q11.png", answer: { lat: 45.43160787336232, lng: 12.328871577952329 }, category: "world" },
+  { id: 12, title: "世界4: イースター島", name: "チリ<br/>イースター島", photo: "/questions/q12.png", answer: { lat: -27.115184894673423, lng: -109.3951422690066 }, category: "world" },
+  { id: 13, title: "世界5: コムローイ祭り", name: "タイ<br/>コムローイ祭り", photo: "/questions/q13.png", answer: { lat: 18.76637382098111, lng: 99.24217092622294 }, category: "world" },
+  { id: 14, title: "世界5: マーライオン", name: "シンガポール<br/>マーライオン", photo: "/questions/q14.png", answer: { lat: 1.2869628927656556, lng: 103.85443270584084 }, category: "world" }
 ];
 
 // 日本カテゴリの最終問題インデックス。締切後にこの問題なら「日本ランキング発表」へ入る

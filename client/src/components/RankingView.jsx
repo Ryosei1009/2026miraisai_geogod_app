@@ -425,9 +425,7 @@ export default function RankingView({
                                 </div>
                             </div>
                             <div className={`w-2/5 flex flex-col justify-center`}>
-                                <p className="mt-4 mb-12 text-center text-5xl font-black text-primary md:text-7xl">
-                                    {revealedName}
-                                </p>
+                                <p className="mt-4 mb-12 text-center text-5xl font-black text-primary md:text-7xl" dangerouslySetInnerHTML={{ __html: revealedName }} />
                                 {answerRevealed && <AnswerPhoto src={revealedPhoto} alt={revealedName} />}
                             </div>
                         </div>
