@@ -136,10 +136,10 @@ const LAST_JAPAN_INDEX = questions.reduce((acc, q, i) => (q.category === "japan"
 // photo: ランキングの表彰台で表示する顔写真。client/public/performers/ にファイルを置く。
 // （ファイルが無い／読み込めない場合はクライアント側で自動的にプレースホルダーの丸になる）
 const performers = [
-  { id: 1, no: "No.1", name: "グループA", photo: "/performers/1.jpg" },
-  { id: 2, no: "No.2", name: "グループB", photo: "/performers/2.jpg" },
-  { id: 3, no: "No.3", name: "グループC", photo: "/performers/3.jpg" },
-  { id: 4, no: "No.4", name: "グループD", photo: "/performers/4.jpg" },
+  { id: 1, no: "No.1", name: "樅木 美月", photo: "/performers/1.jpg" },
+  { id: 2, no: "No.2", name: "貴島 飛舞騎", photo: "/performers/2.jpg" },
+  { id: 3, no: "No.3", name: "柴原 大雅", photo: "/performers/3.jpg" },
+  { id: 4, no: "No.4", name: "大松 隼翔・山下 虎徹", photo: "/performers/4.jpg" },
   { id: 5, no: "No.5", name: "篠原 諒成", photo: "/performers/5.jpg" }
 ];
 
