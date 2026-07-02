@@ -60,7 +60,7 @@ export default function GoodRankingView({ performers, stats, currentIndex, phase
             <main className="page-shell min-h-screen p-4 pt-6 md:p-8 md:pt-12">
                 <div className="mx-auto max-w-[1300px]">
                     {/* 表彰台：2位(左) / 1位(中央) / 3位(右) */}
-                    <div className="grid grid-cols-3 items-end gap-3 mt-4 md:gap-36">
+                    <div className="grid grid-cols-3 items-end gap-3 mt-4 md:gap-33.75">
                         {podium.map(({ row, p }) => {
                             const color = rankColor(p);
                             const revealed = Boolean(row) && isRevealed(p);
