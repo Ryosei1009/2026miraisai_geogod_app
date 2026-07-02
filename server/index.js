@@ -126,8 +126,8 @@ const questions = [
   { id: 10, title: "世界2: サグラダファミリア", name: "スペイン<br/>サグラダファミリア", photo: "/questions/q10.png", answer: { lat: 41.404482707594646, lng: 2.1757298975257253 }, category: "world" },
   { id: 11, title: "世界3: ベネツィア", name: "イタリア<br/>ベネツィア", photo: "/questions/q11.png", answer: { lat: 45.43160787336232, lng: 12.328871577952329 }, category: "world" },
   { id: 12, title: "世界4: イースター島", name: "チリ<br/>イースター島", photo: "/questions/q12.png", answer: { lat: -27.115184894673423, lng: -109.3951422690066 }, category: "world" },
-  { id: 13, title: "世界5: コムローイ祭り", name: "タイ<br/>コムローイ祭り", photo: "/questions/q13.png", answer: { lat: 18.76637382098111, lng: 99.24217092622294 }, category: "world" },
-  { id: 14, title: "世界5: マーライオン", name: "シンガポール<br/>マーライオン", photo: "/questions/q14.png", answer: { lat: 1.2869628927656556, lng: 103.85443270584084 }, category: "world" }
+  { id: 13, title: "世界5: マーライオン", name: "シンガポール<br/>マーライオン", photo: "/questions/q13.png", answer: { lat: 1.2869628927656556, lng: 103.85443270584084 }, category: "world" },
+  { id: 14, title: "世界6: コムローイ祭り", name: "タイ<br/>コムローイ祭り", photo: "/questions/q14.png", answer: { lat: 18.76637382098111, lng: 99.24217092622294 }, category: "world" }
 ];
 
 // 日本カテゴリの最終問題インデックス。締切後にこの問題なら「日本ランキング発表」へ入る
