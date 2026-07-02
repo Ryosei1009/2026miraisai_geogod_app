@@ -120,10 +120,10 @@ export default function GoodRankingView({ performers, stats, currentIndex, phase
                                     />
                                     {revealed ? (
                                         <>
-                                            <span className="truncate text-2xl font-black text-primary md:text-4xl">
+                                            <span className="truncate text-2xl font-black text-primary md:text-5xl">
                                                 {row.performer.name}
                                             </span>
-                                            <span className="num ml-auto flex-none text-3xl font-black md:text-4xl" style={{ color }}>
+                                            <span className="num ml-auto flex-none text-3xl font-black md:text-5xl" style={{ color }}>
                                                 {Math.round(row.rate)}%
                                             </span>
                                         </>
