@@ -123,7 +123,7 @@ const questions = [
   { id: 7, title: "日本6: アドベンチャーワールド", name: "和歌山県<br/>アドベンチャーワールド", photo: "/questions/q7.png", answer: { lat: 33.665559938251924, lng: 135.3728094558746 }, category: "japan" },
   { id: 8, title: "日本7: 草津温泉", name: "群馬県<br/>草津温泉", photo: "/questions/q8.png", answer: { lat: 36.622710727117884, lng: 138.59674411577024 }, category: "japan" },
   { id: 9, title: "世界1: 自由の女神", name: "ニューヨーク<br/>自由の女神", photo: "/questions/q9.png", answer: { lat: 40.686672497253184, lng: -74.0422216486521 }, category: "world" },
-  { id: 10, title: "世界2: サグラダファミリア", name: "スペイン<br/>サグラダファミリア", photo: "/questions/q10.png", answer: { lat: 41.404482707594646, lng: 2.1757298975257253 }, category: "world" },
+  { id: 10, title: "世界2: サグラダファミリア", name: "スペイン<br/>サグラダファミリア", photo: "/questions/q10.png", answer: { lat: 41.40460664686232, lng: 2.1758139180750433 }, category: "world" },
   { id: 11, title: "世界3: ベネツィア", name: "イタリア<br/>ベネツィア", photo: "/questions/q11.png", answer: { lat: 45.43160787336232, lng: 12.328871577952329 }, category: "world" },
   { id: 12, title: "世界4: イースター島", name: "チリ<br/>イースター島", photo: "/questions/q12.png", answer: { lat: -27.115184894673423, lng: -109.3951422690066 }, category: "world" },
   { id: 13, title: "世界5: マーライオン", name: "シンガポール<br/>マーライオン", photo: "/questions/q13.png", answer: { lat: 1.2869628927656556, lng: 103.85443270584084 }, category: "world" },
@@ -353,6 +353,18 @@ function buildGeoStateFor(meta, cache = {}) {
     state.ranking = cache.ranking;
     state.allPins = cache.allPins;
     state.recentResults = cache.recentResults;
+
+    // ランキング画面（運営投影）専用：各問題の答え（正解座標・名称・写真）を
+    // 「回答締切」と同時に配信する。base の revealedAnswer 等は「答えを表示」後の
+    // 公開用で参加者にも届くため（＝答えの漏洩防止）、こちらは admin 限定で分ける。
+    if (!cache.screenAnswer) {
+      const q = questions[geoState.currentQuestionIndex];
+      const closed = geoState.phase === "closed" || geoState.phase === "finished";
+      cache.screenAnswer = { answer: closed && q ? q.answer : null, name: closed && q ? q.name : null, photo: closed && q ? q.photo : null };
+    }
+    state.screenAnswer = cache.screenAnswer.answer;
+    state.screenName = cache.screenAnswer.name;
+    state.screenPhoto = cache.screenAnswer.photo;
   }
 
   if (meta?.role === "participant") {

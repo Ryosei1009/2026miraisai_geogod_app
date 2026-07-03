@@ -203,6 +203,9 @@ export default function RankingView({
     revealStep = 0,
     answerRevealed = false,
     rankingRevealed = false,
+    screenAnswer = null,
+    screenName = null,
+    screenPhoto = null,
     recentResults = []
 }) {
     const categoryKey = currentCategory || "trial";
@@ -236,8 +239,8 @@ export default function RankingView({
     // サーバーの並びは総得点順のため、表示中のスコアで並べ直して上位3名のみ使う
     const sortedRanking = [...ranking].sort((a, b) => getScoreValue(b) - getScoreValue(a));
     const topThree = sortedRanking.slice(0, 3);
-    // 4〜8位（1位発表と同時に表彰台の下へ出す）
-    const rest4to8 = sortedRanking.slice(3, 8);
+    // 4〜7位（1位発表の前、step3で表彰台の下へ出す）
+    const rest4to8 = sortedRanking.slice(3, 7);
     // その問題のランキング用：今回の得点・距離（recentResults は今回得点の高い順でサーバーから届く）
     const recentTop3 = recentResults.slice(0, 3);
     // 表彰台の並び：左=2位, 中央=1位, 右=3位（中央を高く見せる）
@@ -269,7 +272,7 @@ export default function RankingView({
                     ) : (
                       <>
                         <p className="heading-chips text-center text-2xl font-black text-primary md:text-7xl">
-                            ランキング
+                            {{ japan: "日本ランキング", world: "世界ランキング", combined: "総合ランキング" }[announcement] || "ランキング"}
                         </p>
                         <div className="mt-10 grid items-end gap-5 md:grid-cols-3">
                             {podiumOrder.map((rankIndex) => {
@@ -357,10 +360,6 @@ export default function RankingView({
                     )
                 ) : rankingRevealed ? (
                     <>
-                        {/* その問題のランキング：今回の得点による表彰台（上位3名）＋距離＋結果マップ */}
-                        <p className="heading-chips text-center text-2xl font-black text-primary md:text-7xl">
-                            この問題のランキング
-                        </p>
                         {recentTop3.length === 0 ? (
                             <p className="mt-10 text-4xl text-muted">回答者がいませんでした。</p>
                         ) : (
@@ -411,22 +410,24 @@ export default function RankingView({
                     </>
                 ) : (
                     <>
-                        {/* 答え発表：結果マップ＋名称＋写真（ランキングはまだ出さない） */}
-                        <div className={`mt-4 flex gap-4 ${answerRevealed ? "md:grid-cols-2" : ""}`}>
+                        {/* 答え発表：結果マップ＋名称＋写真（ランキングはまだ出さない）。
+                            ランキング画面では「回答締切」と同時に答えを表示する（screen* は運営限定で
+                            締切時に届く。参加者画面は base の revealedAnswer 等で従来どおり「答えを表示」後）。 */}
+                        <div className={`mt-4 flex gap-4 ${isClosed ? "md:grid-cols-2" : ""}`}>
                             <div className="w-3/5 overflow-hidden rounded-2xl border-2 border-theme bg-card">
                                 <div className="h-[86vh] w-full">
                                     <ResultMap
                                         phase={phase}
                                         currentQuestionIndex={currentQuestionIndex}
                                         currentCategory={categoryKey}
-                                        revealedAnswer={answerRevealed ? revealedAnswer : null}
-                                        allPins={answerRevealed ? allPins : []}
+                                        revealedAnswer={isClosed ? screenAnswer : null}
+                                        allPins={isClosed ? allPins : []}
                                     />
                                 </div>
                             </div>
                             <div className={`w-2/5 flex flex-col justify-center`}>
-                                <p className="mt-4 mb-12 text-center text-5xl font-black text-primary md:text-7xl" dangerouslySetInnerHTML={{ __html: revealedName }} />
-                                {answerRevealed && <AnswerPhoto src={revealedPhoto} alt={revealedName} />}
+                                <p className="mt-4 mb-12 text-center text-5xl font-black text-primary md:text-7xl" dangerouslySetInnerHTML={{ __html: screenName || "" }} />
+                                {isClosed && <AnswerPhoto src={screenPhoto} alt={screenName} />}
                             </div>
                         </div>
                     </>

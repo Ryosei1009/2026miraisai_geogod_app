@@ -50,8 +50,8 @@ export default function GeoAdminView({
     const announcement = gameState.announcement || null;
     const revealStep = gameState.revealStep || 0;
     const announceTitleMap = { japan: "日本ランキング発表", world: "世界ランキング発表", combined: "総合ランキング発表" };
-    const revealNextLabel = ["3位を発表", "2位を発表", "4〜8位を発表", "1位を発表"][revealStep] || "発表完了";
-    const revealStatusLabel = ["まだ非表示", "3位まで公開", "2位まで公開", "4〜8位まで公開", "1位まで公開（完了）"][revealStep] || "";
+    const revealNextLabel = ["3位を発表", "2位を発表", "4〜7位を発表", "1位を発表"][revealStep] || "発表完了";
+    const revealStatusLabel = ["まだ非表示", "3位まで公開", "2位まで公開", "4〜7位まで公開", "1位まで公開（完了）"][revealStep] || "";
 
     return (
         <main className="page-shell min-h-screen p-3 pt-6 md:p-6 md:pt-8">

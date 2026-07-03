@@ -708,6 +708,9 @@ export default function App() {
                         revealStep={gameState.revealStep || 0}
                         answerRevealed={Boolean(gameState.answerRevealed)}
                         rankingRevealed={Boolean(gameState.rankingRevealed)}
+                        screenAnswer={gameState.screenAnswer || null}
+                        screenName={gameState.screenName || null}
+                        screenPhoto={gameState.screenPhoto || null}
                         recentResults={gameState.recentResults || []}
                     />
                 )}
