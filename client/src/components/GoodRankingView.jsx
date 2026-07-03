@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // 表彰台/バーの顔写真。写真が無い・読み込めない場合は空の丸（プレースホルダー）にする。
 function Avatar({ src, alt, sizeClass, color, show }) {
@@ -10,7 +10,14 @@ function Avatar({ src, alt, sizeClass, color, show }) {
             style={{ borderColor: color }}
         >
             {showImg && (
-                <img src={src} alt={alt} className="h-full w-full object-cover" onError={() => setFailed(true)} />
+                <img
+                    src={src}
+                    alt={alt}
+                    className="h-full w-full object-cover"
+                    loading="eager"
+                    decoding="sync"
+                    onError={() => setFailed(true)}
+                />
             )}
         </div>
     );
@@ -30,6 +37,24 @@ const rankColor = (p) =>
 export default function GoodRankingView({ performers, stats, currentIndex, phase, revealStep = 0, audienceCount, socketReady }) {
     const currentPerformer = performers[currentIndex] || null;
     const currentStat = stats[currentIndex] || null;
+
+    // 顔写真を先読み＆デコードしてキャッシュしておく。ランキング画面は待機・本番中も
+    // 開きっぱなしなので、発表フェーズに入る前に全員分をキャッシュ済みにできる。
+    // （発表時に初めて読み込むと表示が遅れるため、その待ちをなくす）
+    const preloadRef = useRef([]);
+    const photoKey = (performers || []).map((p) => p?.photo || "").join("|");
+    useEffect(() => {
+        preloadRef.current = (performers || [])
+            .map((p) => p?.photo)
+            .filter(Boolean)
+            .map((src) => {
+                const img = new Image();
+                img.src = src;
+                if (img.decode) img.decode().catch(() => {});
+                return img;
+            });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [photoKey]);
 
     // 最終ランキング：Good率の高い順（同率は票数で比較）。index0=1位
     const finalRanking = performers
