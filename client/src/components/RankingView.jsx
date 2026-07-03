@@ -340,7 +340,7 @@ export default function RankingView({
                                                 {revealed4to8 ? (
                                                     <span className="truncate pb-2 text-2xl font-black leading-tight text-primary md:text-6xl">{row.name}</span>
                                                 ) : (
-                                                    <span className="text-2xl font-black text-subtle md:text-6xl">？</span>
+                                                    <span className="text-2xl font-black text-subtle md:text-7xl">？</span>
                                                 )}
                                             </div>
                                             {revealed4to8 ? (
@@ -349,7 +349,7 @@ export default function RankingView({
                                                     <span className="ml-2 text-lg font-bold text-subtle">pt</span>
                                                 </span>
                                             ) : (
-                                                <span className="num flex-none text-2xl font-black text-subtle md:text-6xl">？</span>
+                                                <span className="num flex-none text-2xl font-black text-subtle md:text-7xl">？</span>
                                             )}
                                         </li>
                                     );
