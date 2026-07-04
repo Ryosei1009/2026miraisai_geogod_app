@@ -206,8 +206,23 @@ export default function RankingView({
     screenAnswer = null,
     screenName = null,
     screenPhoto = null,
+    questionPhotos = [],
     recentResults = []
 }) {
+    // 全問題の写真を先読みしてキャッシュに載せる（答え発表時の表示遅延を防ぐ）。
+    // 投影画面のマウント中に一度だけ実行。写真リストが揃ったタイミングで走らせる。
+    const preloadedRef = useRef(false);
+    useEffect(() => {
+        if (preloadedRef.current || !questionPhotos.length) return;
+        preloadedRef.current = true;
+        for (const src of questionPhotos) {
+            if (!src) continue;
+            const img = new Image();
+            img.decoding = "async";
+            img.src = src;
+        }
+    }, [questionPhotos.length]);
+
     const categoryKey = currentCategory || "trial";
     const isCombined = scoreMode === "combined" && (categoryKey === "japan" || categoryKey === "world");
 

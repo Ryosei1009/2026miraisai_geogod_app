@@ -133,6 +133,10 @@ const questions = [
 // 日本カテゴリの最終問題インデックス。締切後にこの問題なら「日本ランキング発表」へ入る
 const LAST_JAPAN_INDEX = questions.reduce((acc, q, i) => (q.category === "japan" ? i : acc), -1);
 
+// 全問題の写真パス（投影画面でのプリロード用）。管理者にのみ配信する。
+// 参加者へは答え発表前に写真URLを渡さない（画像を先読みされると答えが漏れるため）。
+const QUESTION_PHOTOS = questions.map((q) => q.photo).filter(Boolean);
+
 // photo: ランキングの表彰台で表示する顔写真。client/public/performers/ にファイルを置く。
 // （ファイルが無い／読み込めない場合はクライアント側で自動的にプレースホルダーの丸になる）
 const performers = [
@@ -365,6 +369,8 @@ function buildGeoStateFor(meta, cache = {}) {
     state.screenAnswer = cache.screenAnswer.answer;
     state.screenName = cache.screenAnswer.name;
     state.screenPhoto = cache.screenAnswer.photo;
+    // 投影画面での写真プリロード用（全問分の写真パス）
+    state.questionPhotos = QUESTION_PHOTOS;
   }
 
   if (meta?.role === "participant") {

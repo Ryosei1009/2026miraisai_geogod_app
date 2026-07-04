@@ -711,6 +711,7 @@ export default function App() {
                         screenAnswer={gameState.screenAnswer || null}
                         screenName={gameState.screenName || null}
                         screenPhoto={gameState.screenPhoto || null}
+                        questionPhotos={gameState.questionPhotos || []}
                         recentResults={gameState.recentResults || []}
                     />
                 )}
