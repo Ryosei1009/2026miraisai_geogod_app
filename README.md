@@ -112,3 +112,4 @@ Good 率の分母に「その時点の接続人数」を使っていたため、
 
 - GitHub: [@Ryosei1009](https://github.com/Ryosei1009)
 - Portfolio: [www.shinoryo.com](https://www.shinoryo.com)
+- Mail: shinoryo1009@gmail.com
